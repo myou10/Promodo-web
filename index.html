@@ -84,6 +84,22 @@
             longBreak: { key: 'longBreak', label: 'NGHỈ DÀI' }
         };
 
+        const QUOTE_LIBRARY = [
+            "Sự tập trung là chìa khóa của mọi thành công.",
+            "Một giờ tập trung sâu bằng ba giờ làm việc nửa vời.",
+            "Đừng đếm thời gian, hãy làm cho thời gian đáng giá.",
+            "Kỷ luật là cầu nối giữa mục tiêu và thành tựu.",
+            "Làm việc thông minh, không chỉ làm việc chăm chỉ."
+        ];
+
+        const AMBIENT_SOUNDS = {
+            rain: 'https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg',
+            coffee: 'https://actions.google.com/sounds/v1/crowds/restaurant_ambience.ogg',
+            waves: 'https://actions.google.com/sounds/v1/water/waves_crashing_on_rock_beach.ogg',
+            forest: 'https://actions.google.com/sounds/v1/ambiences/ambience_outside_night_crickets.ogg',
+            noise: 'https://actions.google.com/sounds/v1/science_fiction/space_engine_hum.ogg'
+        };
+
         function App() {
             const [activeTab, setActiveTab] = useState('timer');
             
@@ -95,8 +111,57 @@
             const [isActive, setIsActive] = useState(false);
             
             const [stats, setStats] = useState({ focusMinutesToday: 0, streak: 0, distractions: 0 });
+            
+            const [quote, setQuote] = useState(QUOTE_LIBRARY[0]);
+            const [ytLinkInput, setYtLinkInput] = useState('');
+            const [ytEmbedUrl, setYtEmbedUrl] = useState('');
+            const [activeSound, setActiveSound] = useState(null);
 
             const tickRef = useRef(null);
+            const audioRefs = useRef({});
+            
+            const toggleSound = (soundId) => {
+                // Tạm dừng tất cả âm thanh hiện tại
+                Object.values(audioRefs.current).forEach(audioEl => {
+                    if (audioEl) audioEl.pause();
+                });
+
+                // Nếu đang phát chính âm thanh đó thì chỉ việc lưu trạng thái tắt, không phát nữa
+                if (activeSound === soundId) {
+                    setActiveSound(null);
+                } else {
+                    const audioEl = audioRefs.current[soundId];
+                    if (audioEl) {
+                        const playPromise = audioEl.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(error => {
+                                console.error('Lỗi khi phát âm thanh:', error);
+                                alert('Không thể phát âm thanh! Vui lòng tải lại trang hoặc hệ thống mạng đã chặn link âm thanh.');
+                                setActiveSound(null);
+                            });
+                        }
+                        setActiveSound(soundId);
+                    }
+                }
+            };
+            
+            const applyYoutube = () => {
+                try {
+                    let videoId = '';
+                    if (ytLinkInput.includes('youtu.be/')) {
+                        videoId = ytLinkInput.split('youtu.be/')[1].split('?')[0];
+                    } else if (ytLinkInput.includes('youtube.com/watch')) {
+                        videoId = new URLSearchParams(ytLinkInput.split('?')[1]).get('v');
+                    }
+                    if (videoId) {
+                        setYtEmbedUrl(`https://www.youtube.com/embed/${videoId}?autoplay=1`);
+                    } else {
+                        alert('Vui lòng nhập link YouTube hợp lệ!');
+                    }
+                } catch(e) {
+                    alert('Lỗi khi xử lý link!');
+                }
+            };
 
             // Update time left if durations change while NOT active
             useEffect(() => {
@@ -114,6 +179,7 @@
                     setIsActive(false);
                     if (mode === 'focus') {
                         setStats(s => ({ ...s, focusMinutesToday: s.focusMinutesToday + durations.focus }));
+                        setQuote(QUOTE_LIBRARY[Math.floor(Math.random() * QUOTE_LIBRARY.length)]);
                     }
                 }
                 return () => clearInterval(tickRef.current);
@@ -146,6 +212,10 @@
 
             return (
                 <div className="flex h-screen p-4 md:p-6 lg:p-8 gap-6 font-sans">
+                    {/* The Hidden Audio Elements for ambient sounds */}
+                    {Object.entries(AMBIENT_SOUNDS).map(([key, url]) => (
+                        <audio key={key} ref={el => audioRefs.current[key] = el} src={url} loop preload="none"></audio>
+                    ))}
                     
                     {/* Left Sidebar */}
                     <div className="w-64 flex flex-col gap-6 flex-shrink-0 h-full">
@@ -233,6 +303,11 @@
                                                 <Icon name="RotateCcw" size={24} className="text-slate-500" />
                                             </button>
                                         </div>
+                                        
+                                        {/* Quotes Text */}
+                                        <div className="mt-2 text-center flex flex-col items-center max-w-[280px]">
+                                            <p className="text-[12px] text-slate-400 font-medium italic leading-relaxed">"{quote}"</p>
+                                        </div>
                                     </div>
 
                                     <div className="h-[90px] bg-white rounded-[24px] shadow-soft border border-slate-100 flex items-center px-6 gap-6">
@@ -266,10 +341,20 @@
                                         <div className="flex items-center gap-2 text-slate-800 font-bold text-[15px]">
                                             <Icon name="Youtube" size={22} className="text-red-500 fill-current" /> YouTube Focus
                                         </div>
-                                        <div className="flex gap-2">
-                                            <input type="text" placeholder="Dán link YouTube (ví dụ: https://youtu.be/...)" className="flex-1 bg-[#F4F7FB] border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-600 outline-none focus:border-brand-300 font-medium" />
-                                            <button className="bg-brand-500 text-white font-bold text-[13px] px-4 rounded-xl hover:bg-brand-600 transition-colors">Áp dụng</button>
-                                        </div>
+
+                                        {ytEmbedUrl ? (
+                                            <div className="flex flex-col gap-2">
+                                                <div className="relative w-full overflow-hidden rounded-[16px] bg-slate-100 border border-slate-200" style={{ paddingTop: '56.25%' }}>
+                                                    <iframe src={ytEmbedUrl} className="absolute top-0 left-0 w-full h-full border-0" allow="autoplay; encrypted-media" allowFullScreen></iframe>
+                                                </div>
+                                                <button onClick={() => { setYtEmbedUrl(''); setYtLinkInput(''); }} className="text-[11px] text-red-500 font-bold hover:underline self-end uppercase tracking-wider">Hủy kết nối</button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-2">
+                                                <input type="text" value={ytLinkInput} onChange={e => setYtLinkInput(e.target.value)} placeholder="Dán link YouTube (ví dụ: https://youtu.be/...)" className="flex-1 bg-[#F4F7FB] border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-600 outline-none focus:border-brand-300 font-medium" />
+                                                <button onClick={applyYoutube} className="bg-brand-500 text-white font-bold text-[13px] px-4 rounded-xl hover:bg-brand-600 transition-colors">Áp dụng</button>
+                                            </div>
+                                        )}
                                         
                                         <div className="mt-2">
                                             <p className="font-bold tracking-widest text-[10px] text-slate-400 mb-3 uppercase">Âm thanh mặc định</p>
@@ -281,11 +366,11 @@
                                                     { id: 'forest', icon: 'TreePine', label: 'RỪNG XANH' },
                                                     { id: 'noise', icon: 'Zap', label: 'ỒN TRẮNG' }
                                                 ].map(s => (
-                                                    <button key={s.id} className="flex flex-col items-center gap-2 group">
-                                                        <div className="w-[50px] h-[50px] rounded-[14px] bg-[#F4F7FB] flex items-center justify-center text-slate-400 border border-transparent group-hover:border-brand-200 group-hover:text-brand-500 transition-all group-hover:bg-brand-50">
+                                                    <button key={s.id} onClick={() => toggleSound(s.id)} className="flex flex-col items-center gap-2 group relative">
+                                                        <div className={`w-[50px] h-[50px] rounded-[14px] flex items-center justify-center border transition-all ${activeSound === s.id ? 'bg-brand-100 border-brand-300 text-brand-600 shadow-sm' : 'bg-[#F4F7FB] border-transparent text-slate-400 group-hover:border-brand-200 group-hover:text-brand-500 group-hover:bg-brand-50'}`}>
                                                             <Icon name={s.icon} size={22} strokeWidth={1.5} />
                                                         </div>
-                                                        <span className="text-[9px] font-bold text-slate-400 text-center leading-tight uppercase group-hover:text-brand-500">{s.label}</span>
+                                                        <span className={`text-[9px] font-bold text-center leading-tight uppercase ${activeSound === s.id ? 'text-brand-600' : 'text-slate-400 group-hover:text-brand-500'}`}>{s.label}</span>
                                                     </button>
                                                 ))}
                                             </div>
