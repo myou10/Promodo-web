@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="vi" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Focus - Pomodoro & Analytics</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#4F46E5', 600: '#4338CA', 700: '#3730A3' }
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.03)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Recharts Dependencies -->
+    <script src="https://unpkg.com/prop-types/prop-types.min.js"></script>
+    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F4F7FB; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        /* Scrollbar hide */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="text-slate-800 h-screen overflow-hidden">
+    <div id="root" class="h-full"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const RCharts = window.Recharts;
+
+        // Wrapped Icon
+        const Icon = ({ name, size = 24, className = "", strokeWidth = 2 }) => {
+            const iconRef = useRef(null);
+            
+            useEffect(() => {
+                if (iconRef.current && window.lucide && window.lucide.icons[name]) {
+                    const iconNode = window.lucide.createElement(window.lucide.icons[name]);
+                    iconNode.setAttribute('width', size);
+                    iconNode.setAttribute('height', size);
+                    iconNode.setAttribute('stroke-width', strokeWidth);
+                    iconNode.setAttribute('class', className);
+                    iconRef.current.innerHTML = '';
+                    iconRef.current.appendChild(iconNode);
+                }
+            }, [name, size, className, strokeWidth]);
+
+            return <span ref={iconRef} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}></span>;
+        };
+
+        const MODES = {
+            focus: { key: 'focus', label: 'TẬP TRUNG' },
+            shortBreak: { key: 'shortBreak', label: 'NGHỈ NGẮN' },
+            longBreak: { key: 'longBreak', label: 'NGHỈ DÀI' }
+        };
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('timer');
+            
+            // Customizable durations (in minutes)
+            const [durations, setDurations] = useState({ focus: 25, shortBreak: 5, longBreak: 15 });
+            
+            const [mode, setMode] = useState('focus');
+            const [timeLeft, setTimeLeft] = useState(durations.focus * 60);
+            const [isActive, setIsActive] = useState(false);
+            
+            const [stats, setStats] = useState({ focusMinutesToday: 0, streak: 0, distractions: 0 });
+
+            const tickRef = useRef(null);
+
+            // Update time left if durations change while NOT active
+            useEffect(() => {
+                if (!isActive) {
+                    setTimeLeft(durations[mode] * 60);
+                }
+            }, [durations, mode, isActive]);
+
+            // Timer Interval
+            useEffect(() => {
+                if (isActive && timeLeft > 0) {
+                    tickRef.current = setInterval(() => setTimeLeft(t => t - 1), 1000);
+                } else if (timeLeft === 0 && isActive) {
+                    clearInterval(tickRef.current);
+                    setIsActive(false);
+                    if (mode === 'focus') {
+                        setStats(s => ({ ...s, focusMinutesToday: s.focusMinutesToday + durations.focus }));
+                    }
+                }
+                return () => clearInterval(tickRef.current);
+            }, [isActive, timeLeft, mode, durations]);
+
+            const handleSwitchMode = (newMode) => {
+                setIsActive(false);
+                setMode(newMode);
+                setTimeLeft(durations[newMode] * 60);
+            };
+
+            const toggleTimer = () => setIsActive(!isActive);
+            const resetTimer = () => {
+                setIsActive(false);
+                setTimeLeft(durations[mode] * 60);
+            };
+
+            const formatTime = (seconds) => {
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            };
+
+            // Calculate SVG progress
+            const totalSecs = durations[mode] * 60;
+            const progressOffset = ((totalSecs - timeLeft) / totalSecs) * 100;
+            const circleRadius = 48;
+            const circumference = 2 * Math.PI * circleRadius;
+            const strokeDashoffset = (progressOffset / 100) * circumference;
+
+            return (
+                <div className="flex h-screen p-4 md:p-6 lg:p-8 gap-6 font-sans">
+                    
+                    {/* Left Sidebar */}
+                    <div className="w-64 flex flex-col gap-6 flex-shrink-0 h-full">
+                        <div className="flex items-center gap-3 pl-2">
+                            <div className="bg-brand-500 text-white p-2 rounded-xl">
+                                <Icon name="Brain" size={24} />
+                            </div>
+                            <span className="font-bold text-xl tracking-tight text-slate-800">Smart Focus</span>
+                        </div>
+
+                        <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-100 flex flex-col items-center justify-center text-center">
+                            <div className="w-16 h-16 bg-[#F3F4F6] rounded-full flex items-center justify-center mb-4 relative">
+                                <Icon name="Smile" size={32} className="text-slate-400" />
+                            </div>
+                            <p className="text-[11px] font-bold text-slate-400 tracking-[0.2em] uppercase mb-2">Đang sẵn sàng</p>
+                            <p className="text-sm text-slate-500 italic font-medium leading-relaxed">"Hôm nay chúng ta sẽ chinh phục điều gì nào?"</p>
+                        </div>
+
+                        <nav className="flex flex-col gap-2 flex-1">
+                            {[
+                                { id: 'timer', icon: 'Clock', label: 'Đồng hồ' },
+                                { id: 'tasks', icon: 'ListTodo', label: 'Công việc' },
+                                { id: 'stats', icon: 'BarChart2', label: 'Thống kê' },
+                                { id: 'settings', icon: 'Settings', label: 'Cài đặt' }
+                            ].map(item => (
+                                <button key={item.id} onClick={() => setActiveTab(item.id)}
+                                    className={`flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all
+                                    ${activeTab === item.id 
+                                        ? 'bg-brand-500 text-white shadow-md' 
+                                        : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-700'}`}>
+                                    <Icon name={item.icon} size={22} className={activeTab === item.id ? 'text-white' : 'text-slate-400'} />
+                                    {item.label}
+                                </button>
+                            ))}
+                        </nav>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="flex-1 flex gap-6 h-full overflow-hidden">
+                        
+                        {/* TIMER VIEW (Includes Center + Right Column) */}
+                        {activeTab === 'timer' && (
+                            <>
+                                {/* Center Column - Timer View */}
+                                <div className="flex-1 flex flex-col gap-6 min-w-0">
+                                    <div className="flex-1 bg-white rounded-[32px] shadow-soft border border-slate-100 flex flex-col items-center relative p-8">
+                                        
+                                        {/* Modifiers */}
+                                        <div className="flex bg-[#F3F4F6] p-1.5 rounded-full border border-slate-100 mt-2">
+                                            {Object.values(MODES).map((m) => (
+                                                <button key={m.key} onClick={() => handleSwitchMode(m.key)}
+                                                    className={`px-8 py-2.5 rounded-full text-xs font-bold transition-all tracking-wider ${mode === m.key ? 'bg-white text-brand-500 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                                                    {m.label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Timer Circle */}
+                                        <div className="relative flex items-center justify-center w-80 h-80 my-auto">
+                                            <svg className="absolute w-full h-full transform -rotate-90">
+                                                <circle cx="50%" cy="50%" r="48%" stroke="currentColor" strokeWidth="2" fill="transparent" className="text-slate-100" />
+                                                <circle cx="50%" cy="50%" r="48%" stroke="currentColor" strokeWidth="4" fill="transparent" 
+                                                    className="text-brand-500 transition-all duration-1000 ease-linear"
+                                                    strokeDasharray={`${circumference}%`}
+                                                    strokeDashoffset={`${strokeDashoffset}%`}
+                                                    strokeLinecap="round"
+                                                />
+                                            </svg>
+                                            <div className="text-center z-10 flex flex-col items-center translate-y-2">
+                                                <span className="font-mono text-7xl font-bold tracking-tight text-[#1E293B]">
+                                                    {formatTime(timeLeft)}
+                                                </span>
+                                                <span className="mt-4 text-xs font-bold text-slate-400 tracking-[0.2em]">{isActive ? 'ĐANG CHẠY' : 'TẠM DỪNG'}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Controls Bottom */}
+                                        <div className="flex items-center gap-4 mb-4">
+                                            <button onClick={toggleTimer} 
+                                                className="flex bg-brand-500 text-white h-[60px] rounded-[20px] items-center justify-center gap-3 font-bold text-sm tracking-widest shadow-md hover:bg-brand-600 transition-colors" style={{width: '240px'}}>
+                                                <Icon name={isActive ? 'Pause' : 'Play'} size={20} className="fill-current" />
+                                                {isActive ? 'TẠM DỪNG' : 'BẮT ĐẦU'}
+                                            </button>
+                                            <button onClick={resetTimer} className="w-[60px] h-[60px] rounded-[20px] bg-[#F4F7FB] border border-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors">
+                                                <Icon name="RotateCcw" size={24} className="text-slate-500" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="h-[90px] bg-white rounded-[24px] shadow-soft border border-slate-100 flex items-center px-6 gap-6">
+                                        <div className="flex items-center gap-3 w-48">
+                                            <div className="w-10 h-10 rounded-full border-2 border-orange-100 bg-orange-50 text-orange-400 flex items-center justify-center shrink-0">
+                                                <Icon name="AlertCircle" size={20} />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-[13px] text-slate-800">Bị xao nhãng?</p>
+                                                <p className="text-[11px] font-medium text-slate-500">Chuỗi hiện tại: 0 phiên</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 flex gap-3 justify-end">
+                                            {[
+                                                { id: 'phone', label: 'ĐIỆN THOẠI' },
+                                                { id: 'tired', label: 'MỆT MỎI' },
+                                                { id: 'noise', label: 'TIẾNG ỒN' }
+                                            ].map(d => (
+                                                <button key={d.id} onClick={() => setStats(s => ({...s, distractions: s.distractions + 1}))} 
+                                                    className="px-5 h-10 bg-[#F4F7FB] hover:bg-slate-200 text-slate-600 rounded-xl text-[11px] font-bold flex items-center justify-center tracking-wider transition-colors">
+                                                    {d.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right Column - Tools */}
+                                <div className="w-[340px] flex flex-col gap-6 flex-shrink-0">
+                                    <div className="bg-white rounded-[24px] p-6 shadow-soft border border-slate-100 flex flex-col gap-5">
+                                        <div className="flex items-center gap-2 text-slate-800 font-bold text-[15px]">
+                                            <Icon name="Youtube" size={22} className="text-red-500 fill-current" /> YouTube Focus
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input type="text" placeholder="Dán link YouTube (ví dụ: https://youtu.be/...)" className="flex-1 bg-[#F4F7FB] border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-600 outline-none focus:border-brand-300 font-medium" />
+                                            <button className="bg-brand-500 text-white font-bold text-[13px] px-4 rounded-xl hover:bg-brand-600 transition-colors">Áp dụng</button>
+                                        </div>
+                                        
+                                        <div className="mt-2">
+                                            <p className="font-bold tracking-widest text-[10px] text-slate-400 mb-3 uppercase">Âm thanh mặc định</p>
+                                            <div className="grid grid-cols-5 gap-2">
+                                                {[
+                                                    { id: 'rain', icon: 'CloudRain', label: 'TIẾNG MƯA' },
+                                                    { id: 'coffee', icon: 'Coffee', label: 'QUÁN CÀ PHÊ' },
+                                                    { id: 'waves', icon: 'Waves', label: 'SÓNG BIỂN' },
+                                                    { id: 'forest', icon: 'TreePine', label: 'RỪNG XANH' },
+                                                    { id: 'noise', icon: 'Zap', label: 'ỒN TRẮNG' }
+                                                ].map(s => (
+                                                    <button key={s.id} className="flex flex-col items-center gap-2 group">
+                                                        <div className="w-[50px] h-[50px] rounded-[14px] bg-[#F4F7FB] flex items-center justify-center text-slate-400 border border-transparent group-hover:border-brand-200 group-hover:text-brand-500 transition-all group-hover:bg-brand-50">
+                                                            <Icon name={s.icon} size={22} strokeWidth={1.5} />
+                                                        </div>
+                                                        <span className="text-[9px] font-bold text-slate-400 text-center leading-tight uppercase group-hover:text-brand-500">{s.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 bg-white rounded-[24px] p-6 shadow-soft border border-slate-100 flex flex-col">
+                                        <div className="flex items-center gap-2 text-slate-800 font-bold text-[15px] mb-4">
+                                            <Icon name="CheckCircle2" size={22} className="text-brand-500" /> Đang thực hiện
+                                        </div>
+                                        <div className="flex-1 border-2 border-dashed border-slate-200 rounded-[16px] flex items-center justify-center p-6 text-center text-slate-400 text-[13px] font-medium bg-slate-50/50">
+                                            Chưa có công việc nào được chọn
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* SETTINGS VIEW */}
+                        {activeTab === 'settings' && (
+                            <div className="flex-1 bg-white rounded-[32px] shadow-soft border border-slate-100 p-10 overflow-y-auto">
+                                <h2 className="text-2xl font-bold mb-8 flex items-center gap-3">
+                                    <Icon name="Settings" size={28} className="text-brand-500" />
+                                    Cài đặt ứng dụng
+                                </h2>
+                                
+                                <div className="max-w-2xl space-y-10">
+                                    
+                                    {/* Edit Pomodoro Durations */}
+                                    <div className="space-y-5">
+                                        <div>
+                                            <h3 className="text-lg font-bold text-slate-800">Thời gian Pomodoro</h3>
+                                            <p className="text-[13px] text-slate-500 font-medium mt-1">Tùy chỉnh thời lượng cho các khoảng thời gian tập trung và nghỉ ngơi (tính bằng phút).</p>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div className="flex flex-col gap-2">
+                                                <label className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">TẬP TRUNG</label>
+                                                <input type="number" min="1" max="120" value={durations.focus} 
+                                                    onChange={(e) => setDurations({...durations, focus: Number(e.target.value) || 1})}
+                                                    className="bg-[#F4F7FB] border border-slate-200 rounded-xl px-5 py-3.5 outline-none focus:border-brand-400 focus:bg-white transition-all font-mono font-bold text-lg text-slate-700" />
+                                            </div>
+                                            <div className="flex flex-col gap-2">
+                                                <label className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">NGHỈ NGẮN</label>
+                                                <input type="number" min="1" max="30" value={durations.shortBreak} 
+                                                    onChange={(e) => setDurations({...durations, shortBreak: Number(e.target.value) || 1})}
+                                                    className="bg-[#F4F7FB] border border-slate-200 rounded-xl px-5 py-3.5 outline-none focus:border-brand-400 focus:bg-white transition-all font-mono font-bold text-lg text-slate-700" />
+                                            </div>
+                                            <div className="flex flex-col gap-2">
+                                                <label className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">NGHỈ DÀI</label>
+                                                <input type="number" min="1" max="60" value={durations.longBreak} 
+                                                    onChange={(e) => setDurations({...durations, longBreak: Number(e.target.value) || 1})}
+                                                    className="bg-[#F4F7FB] border border-slate-200 rounded-xl px-5 py-3.5 outline-none focus:border-brand-400 focus:bg-white transition-all font-mono font-bold text-lg text-slate-700" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <hr className="border-slate-100" />
+                                    
+                                    <div className="flex justify-between items-center bg-red-50 p-6 rounded-[24px]">
+                                        <div>
+                                            <h3 className="font-bold text-red-600 text-lg">Xóa dữ liệu</h3>
+                                            <p className="text-[13px] text-red-400 font-medium mt-1">Xóa toàn bộ thống kê lịch sử. Không thể hoàn tác.</p>
+                                        </div>
+                                        <button className="px-6 py-3 bg-red-600 text-white font-bold text-[13px] rounded-xl hover:bg-red-700 transition-colors shadow-md"
+                                            onClick={() => { if(confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu thống kê?')) setStats({ focusMinutesToday: 0, streak: 0, distractions: 0 }); }}>
+                                            XÓA DỮ LIỆU
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* STATS VIEW STUB */}
+                        {activeTab === 'stats' && (
+                            <div className="flex-1 bg-white rounded-[32px] shadow-soft border border-slate-100 p-10 overflow-y-auto">
+                                <h2 className="text-2xl font-bold mb-8">Thống kê hoạt động</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                    <div className="bg-brand-50 p-6 rounded-[20px] border border-brand-100">
+                                        <p className="text-brand-600 font-bold mb-2 text-xs uppercase tracking-widest">Phút Tập Trung</p>
+                                        <p className="text-4xl font-mono font-bold text-brand-700">{stats.focusMinutesToday}</p>
+                                    </div>
+                                    <div className="bg-[#ecfdf5] p-6 rounded-[20px] border border-[#d1fae5]">
+                                        <p className="text-[#059669] font-bold mb-2 text-xs uppercase tracking-widest">Chuỗi (Ngày)</p>
+                                        <p className="text-4xl font-mono font-bold text-[#047857]">{stats.streak}</p>
+                                    </div>
+                                    <div className="bg-[#fff7ed] p-6 rounded-[20px] border border-[#ffedd5]">
+                                        <p className="text-[#ea580c] font-bold mb-2 text-xs uppercase tracking-widest">Xao Nhãng</p>
+                                        <p className="text-4xl font-mono font-bold text-[#c2410c]">{stats.distractions}</p>
+                                    </div>
+                                </div>
+                                <div className="h-64 border-2 border-dashed border-slate-200 rounded-[24px] flex items-center justify-center bg-slate-50 text-slate-400 font-medium">
+                                        (Khu vực hiển thị biểu đồ Recharts)
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* TASKS VIEW STUB */}
+                        {activeTab === 'tasks' && (
+                            <div className="flex-1 bg-white rounded-[32px] shadow-soft border border-slate-100 p-10 overflow-y-auto">
+                                <h2 className="text-2xl font-bold mb-8">Quản lý công việc</h2>
+                                <div className="border border-slate-200 rounded-xl p-4 flex gap-4">
+                                    <input type="text" placeholder="Thêm công việc mới..." className="flex-1 outline-none text-sm font-medium" />
+                                    <button className="bg-brand-500 text-white px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider">Thêm</button>
+                                </div>
+                            </div>
+                        )}
+
+                    </div>
+                </div>
+            );
+        }
+
+        const root = window.ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
