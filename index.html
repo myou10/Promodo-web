@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html lang="vi" class="light">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Focus - Pomodoro & Analytics</title>
-    
+
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
-    
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@700&display=swap"
+        rel="stylesheet">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -33,25 +36,39 @@
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
+
     <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
+
     <!-- Recharts Dependencies -->
     <script src="https://unpkg.com/prop-types/prop-types.min.js"></script>
     <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
 
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    
+
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #F4F7FB; }
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F4F7FB;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
         /* Scrollbar hide */
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
     </style>
 </head>
+
 <body class="text-slate-800 h-screen overflow-hidden">
     <div id="root" class="h-full"></div>
 
@@ -62,7 +79,7 @@
         // Wrapped Icon
         const Icon = ({ name, size = 24, className = "", strokeWidth = 2 }) => {
             const iconRef = useRef(null);
-            
+
             useEffect(() => {
                 if (iconRef.current && window.lucide && window.lucide.icons[name]) {
                     const iconNode = window.lucide.createElement(window.lucide.icons[name]);
@@ -92,59 +109,295 @@
             "Làm việc thông minh, không chỉ làm việc chăm chỉ."
         ];
 
-        const AMBIENT_SOUNDS = {
-            rain: 'https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg',
-            coffee: 'https://actions.google.com/sounds/v1/crowds/restaurant_ambience.ogg',
-            waves: 'https://actions.google.com/sounds/v1/water/waves_crashing_on_rock_beach.ogg',
-            forest: 'https://actions.google.com/sounds/v1/ambiences/ambience_outside_night_crickets.ogg',
-            noise: 'https://actions.google.com/sounds/v1/science_fiction/space_engine_hum.ogg'
-        };
+        // ===== Web Audio API Ambient Sound Generator =====
+        const AudioEngine = (() => {
+            let ctx = null;
+            let activeNodes = {};
+
+            function getCtx() {
+                if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.state === 'suspended') ctx.resume();
+                return ctx;
+            }
+
+            // Create white noise buffer
+            function createNoiseBuffer(ac, duration = 2) {
+                const sampleRate = ac.sampleRate;
+                const length = sampleRate * duration;
+                const buffer = ac.createBuffer(2, length, sampleRate);
+                for (let ch = 0; ch < 2; ch++) {
+                    const data = buffer.getChannelData(ch);
+                    for (let i = 0; i < length; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                }
+                return buffer;
+            }
+
+            // 🌧 Rain: bandpass-filtered noise + low rumble
+            function startRain(ac) {
+                const gain = ac.createGain();
+                gain.gain.value = 0.35;
+                gain.connect(ac.destination);
+
+                // Main rain noise
+                const noiseSource = ac.createBufferSource();
+                noiseSource.buffer = createNoiseBuffer(ac, 2);
+                noiseSource.loop = true;
+                const bp = ac.createBiquadFilter();
+                bp.type = 'bandpass';
+                bp.frequency.value = 800;
+                bp.Q.value = 0.5;
+                noiseSource.connect(bp);
+                bp.connect(gain);
+                noiseSource.start();
+
+                // Low rumble layer
+                const rumble = ac.createBufferSource();
+                rumble.buffer = createNoiseBuffer(ac, 2);
+                rumble.loop = true;
+                const lp = ac.createBiquadFilter();
+                lp.type = 'lowpass';
+                lp.frequency.value = 150;
+                const rumbleGain = ac.createGain();
+                rumbleGain.gain.value = 0.15;
+                rumble.connect(lp);
+                lp.connect(rumbleGain);
+                rumbleGain.connect(ac.destination);
+                rumble.start();
+
+                return { nodes: [noiseSource, rumble, bp, lp, gain, rumbleGain], stop() { noiseSource.stop(); rumble.stop(); gain.disconnect(); rumbleGain.disconnect(); } };
+            }
+
+            // ☕ Coffee shop: brown noise + subtle chatter texture
+            function startCoffee(ac) {
+                const gain = ac.createGain();
+                gain.gain.value = 0.25;
+                gain.connect(ac.destination);
+
+                // Brown noise (random walk)
+                const bufLen = ac.sampleRate * 2;
+                const buffer = ac.createBuffer(2, bufLen, ac.sampleRate);
+                for (let ch = 0; ch < 2; ch++) {
+                    const data = buffer.getChannelData(ch);
+                    let last = 0;
+                    for (let i = 0; i < bufLen; i++) {
+                        const white = Math.random() * 2 - 1;
+                        data[i] = (last + 0.02 * white) / 1.02;
+                        last = data[i];
+                        data[i] *= 3.5;
+                    }
+                }
+                const brown = ac.createBufferSource();
+                brown.buffer = buffer;
+                brown.loop = true;
+                const bp = ac.createBiquadFilter();
+                bp.type = 'bandpass';
+                bp.frequency.value = 500;
+                bp.Q.value = 0.3;
+                brown.connect(bp);
+                bp.connect(gain);
+                brown.start();
+
+                // Chatter layer (higher filtered noise)
+                const chatter = ac.createBufferSource();
+                chatter.buffer = createNoiseBuffer(ac, 2);
+                chatter.loop = true;
+                const chatterBP = ac.createBiquadFilter();
+                chatterBP.type = 'bandpass';
+                chatterBP.frequency.value = 2000;
+                chatterBP.Q.value = 1.5;
+                const chatterGain = ac.createGain();
+                chatterGain.gain.value = 0.06;
+                chatter.connect(chatterBP);
+                chatterBP.connect(chatterGain);
+                chatterGain.connect(ac.destination);
+                chatter.start();
+
+                // Subtle clink/tink (very soft high-freq pings via oscillator)
+                const clinkGain = ac.createGain();
+                clinkGain.gain.value = 0.0;
+                clinkGain.connect(ac.destination);
+                const clinkInterval = setInterval(() => {
+                    if (Math.random() > 0.6) {
+                        const osc = ac.createOscillator();
+                        osc.frequency.value = 2000 + Math.random() * 3000;
+                        osc.type = 'sine';
+                        const envGain = ac.createGain();
+                        envGain.gain.setValueAtTime(0.03, ac.currentTime);
+                        envGain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15);
+                        osc.connect(envGain);
+                        envGain.connect(ac.destination);
+                        osc.start();
+                        osc.stop(ac.currentTime + 0.15);
+                    }
+                }, 800);
+
+                return { nodes: [brown, chatter, bp, chatterBP, gain, chatterGain, clinkGain], stop() { brown.stop(); chatter.stop(); clearInterval(clinkInterval); gain.disconnect(); chatterGain.disconnect(); clinkGain.disconnect(); } };
+            }
+
+            // 🌊 Waves: amplitude-modulated noise
+            function startWaves(ac) {
+                const gain = ac.createGain();
+                gain.gain.value = 0.3;
+                gain.connect(ac.destination);
+
+                const noise = ac.createBufferSource();
+                noise.buffer = createNoiseBuffer(ac, 4);
+                noise.loop = true;
+
+                // LFO for wave rhythm
+                const lfo = ac.createOscillator();
+                lfo.type = 'sine';
+                lfo.frequency.value = 0.12; // slow wave cycle
+                const lfoGain = ac.createGain();
+                lfoGain.gain.value = 0.4;
+                lfo.connect(lfoGain);
+
+                // Shape the noise
+                const lp = ac.createBiquadFilter();
+                lp.type = 'lowpass';
+                lp.frequency.value = 600;
+
+                const modGain = ac.createGain();
+                modGain.gain.value = 0.6;
+                lfoGain.connect(modGain.gain);
+
+                noise.connect(lp);
+                lp.connect(modGain);
+                modGain.connect(gain);
+                lfo.start();
+                noise.start();
+
+                // Foam/hiss layer
+                const hiss = ac.createBufferSource();
+                hiss.buffer = createNoiseBuffer(ac, 2);
+                hiss.loop = true;
+                const hp = ac.createBiquadFilter();
+                hp.type = 'highpass';
+                hp.frequency.value = 3000;
+                const hissGain = ac.createGain();
+                hissGain.gain.value = 0.05;
+                hiss.connect(hp);
+                hp.connect(hissGain);
+                hissGain.connect(ac.destination);
+                hiss.start();
+
+                return { nodes: [noise, lfo, lp, gain, lfoGain, modGain, hiss, hp, hissGain], stop() { noise.stop(); lfo.stop(); hiss.stop(); gain.disconnect(); hissGain.disconnect(); } };
+            }
+
+            // 🌲 Forest: filtered noise + cricket-like oscillators
+            function startForest(ac) {
+                const gain = ac.createGain();
+                gain.gain.value = 0.15;
+                gain.connect(ac.destination);
+
+                // Wind base
+                const wind = ac.createBufferSource();
+                wind.buffer = createNoiseBuffer(ac, 3);
+                wind.loop = true;
+                const bp = ac.createBiquadFilter();
+                bp.type = 'bandpass';
+                bp.frequency.value = 300;
+                bp.Q.value = 0.8;
+                wind.connect(bp);
+                bp.connect(gain);
+                wind.start();
+
+                // Cricket chirps
+                const cricketIntervals = [];
+                function chirp() {
+                    const osc = ac.createOscillator();
+                    osc.type = 'sine';
+                    osc.frequency.value = 4000 + Math.random() * 2000;
+                    const envGain = ac.createGain();
+                    const now = ac.currentTime;
+                    envGain.gain.setValueAtTime(0, now);
+
+                    // Rapid on-off pattern like a cricket
+                    const chirpCount = 2 + Math.floor(Math.random() * 4);
+                    for (let i = 0; i < chirpCount; i++) {
+                        envGain.gain.setValueAtTime(0.04, now + i * 0.07);
+                        envGain.gain.setValueAtTime(0, now + i * 0.07 + 0.03);
+                    }
+                    osc.connect(envGain);
+                    envGain.connect(ac.destination);
+                    osc.start();
+                    osc.stop(now + chirpCount * 0.07 + 0.1);
+                }
+
+                cricketIntervals.push(setInterval(() => { if (Math.random() > 0.4) chirp(); }, 600));
+                cricketIntervals.push(setInterval(() => { if (Math.random() > 0.5) chirp(); }, 1100));
+
+                return { nodes: [wind, bp, gain], stop() { wind.stop(); cricketIntervals.forEach(clearInterval); gain.disconnect(); } };
+            }
+
+            // ⚡ White noise
+            function startWhiteNoise(ac) {
+                const gain = ac.createGain();
+                gain.gain.value = 0.2;
+                gain.connect(ac.destination);
+
+                const noise = ac.createBufferSource();
+                noise.buffer = createNoiseBuffer(ac, 2);
+                noise.loop = true;
+                noise.connect(gain);
+                noise.start();
+
+                return { nodes: [noise, gain], stop() { noise.stop(); gain.disconnect(); } };
+            }
+
+            return {
+                start(soundId) {
+                    const ac = getCtx();
+                    const starters = { rain: startRain, coffee: startCoffee, waves: startWaves, forest: startForest, noise: startWhiteNoise };
+                    if (starters[soundId]) {
+                        activeNodes[soundId] = starters[soundId](ac);
+                    }
+                },
+                stop(soundId) {
+                    if (activeNodes[soundId]) {
+                        try { activeNodes[soundId].stop(); } catch (e) { }
+                        delete activeNodes[soundId];
+                    }
+                },
+                stopAll() {
+                    Object.keys(activeNodes).forEach(id => this.stop(id));
+                }
+            };
+        })();
 
         function App() {
             const [activeTab, setActiveTab] = useState('timer');
-            
+
             // Customizable durations (in minutes)
             const [durations, setDurations] = useState({ focus: 25, shortBreak: 5, longBreak: 15 });
-            
+
             const [mode, setMode] = useState('focus');
             const [timeLeft, setTimeLeft] = useState(durations.focus * 60);
             const [isActive, setIsActive] = useState(false);
-            
+
             const [stats, setStats] = useState({ focusMinutesToday: 0, streak: 0, distractions: 0 });
-            
+
             const [quote, setQuote] = useState(QUOTE_LIBRARY[0]);
             const [ytLinkInput, setYtLinkInput] = useState('');
             const [ytEmbedUrl, setYtEmbedUrl] = useState('');
             const [activeSound, setActiveSound] = useState(null);
 
             const tickRef = useRef(null);
-            const audioRefs = useRef({});
-            
-            const toggleSound = (soundId) => {
-                // Tạm dừng tất cả âm thanh hiện tại
-                Object.values(audioRefs.current).forEach(audioEl => {
-                    if (audioEl) audioEl.pause();
-                });
 
-                // Nếu đang phát chính âm thanh đó thì chỉ việc lưu trạng thái tắt, không phát nữa
+            const toggleSound = (soundId) => {
+                // Dừng tất cả âm thanh hiện tại
+                AudioEngine.stopAll();
+
                 if (activeSound === soundId) {
                     setActiveSound(null);
                 } else {
-                    const audioEl = audioRefs.current[soundId];
-                    if (audioEl) {
-                        const playPromise = audioEl.play();
-                        if (playPromise !== undefined) {
-                            playPromise.catch(error => {
-                                console.error('Lỗi khi phát âm thanh:', error);
-                                alert('Không thể phát âm thanh! Vui lòng tải lại trang hoặc hệ thống mạng đã chặn link âm thanh.');
-                                setActiveSound(null);
-                            });
-                        }
-                        setActiveSound(soundId);
-                    }
+                    AudioEngine.start(soundId);
+                    setActiveSound(soundId);
                 }
             };
-            
+
             const applyYoutube = () => {
                 try {
                     let videoId = '';
@@ -158,7 +411,7 @@
                     } else {
                         alert('Vui lòng nhập link YouTube hợp lệ!');
                     }
-                } catch(e) {
+                } catch (e) {
                     alert('Lỗi khi xử lý link!');
                 }
             };
@@ -212,11 +465,7 @@
 
             return (
                 <div className="flex h-screen p-4 md:p-6 lg:p-8 gap-6 font-sans">
-                    {/* The Hidden Audio Elements for ambient sounds */}
-                    {Object.entries(AMBIENT_SOUNDS).map(([key, url]) => (
-                        <audio key={key} ref={el => audioRefs.current[key] = el} src={url} loop preload="none"></audio>
-                    ))}
-                    
+
                     {/* Left Sidebar */}
                     <div className="w-64 flex flex-col gap-6 flex-shrink-0 h-full">
                         <div className="flex items-center gap-3 pl-2">
@@ -243,9 +492,9 @@
                             ].map(item => (
                                 <button key={item.id} onClick={() => setActiveTab(item.id)}
                                     className={`flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all
-                                    ${activeTab === item.id 
-                                        ? 'bg-brand-500 text-white shadow-md' 
-                                        : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-700'}`}>
+                                    ${activeTab === item.id
+                                            ? 'bg-brand-500 text-white shadow-md'
+                                            : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-700'}`}>
                                     <Icon name={item.icon} size={22} className={activeTab === item.id ? 'text-white' : 'text-slate-400'} />
                                     {item.label}
                                 </button>
@@ -255,14 +504,14 @@
 
                     {/* Main Content */}
                     <div className="flex-1 flex gap-6 h-full overflow-hidden">
-                        
+
                         {/* TIMER VIEW (Includes Center + Right Column) */}
                         {activeTab === 'timer' && (
                             <>
                                 {/* Center Column - Timer View */}
                                 <div className="flex-1 flex flex-col gap-6 min-w-0">
                                     <div className="flex-1 bg-white rounded-[32px] shadow-soft border border-slate-100 flex flex-col items-center relative p-8">
-                                        
+
                                         {/* Modifiers */}
                                         <div className="flex bg-[#F3F4F6] p-1.5 rounded-full border border-slate-100 mt-2">
                                             {Object.values(MODES).map((m) => (
@@ -277,7 +526,7 @@
                                         <div className="relative flex items-center justify-center w-80 h-80 my-auto">
                                             <svg className="absolute w-full h-full transform -rotate-90">
                                                 <circle cx="50%" cy="50%" r="48%" stroke="currentColor" strokeWidth="2" fill="transparent" className="text-slate-100" />
-                                                <circle cx="50%" cy="50%" r="48%" stroke="currentColor" strokeWidth="4" fill="transparent" 
+                                                <circle cx="50%" cy="50%" r="48%" stroke="currentColor" strokeWidth="4" fill="transparent"
                                                     className="text-brand-500 transition-all duration-1000 ease-linear"
                                                     strokeDasharray={`${circumference}%`}
                                                     strokeDashoffset={`${strokeDashoffset}%`}
@@ -294,8 +543,8 @@
 
                                         {/* Controls Bottom */}
                                         <div className="flex items-center gap-4 mb-4">
-                                            <button onClick={toggleTimer} 
-                                                className="flex bg-brand-500 text-white h-[60px] rounded-[20px] items-center justify-center gap-3 font-bold text-sm tracking-widest shadow-md hover:bg-brand-600 transition-colors" style={{width: '240px'}}>
+                                            <button onClick={toggleTimer}
+                                                className="flex bg-brand-500 text-white h-[60px] rounded-[20px] items-center justify-center gap-3 font-bold text-sm tracking-widest shadow-md hover:bg-brand-600 transition-colors" style={{ width: '240px' }}>
                                                 <Icon name={isActive ? 'Pause' : 'Play'} size={20} className="fill-current" />
                                                 {isActive ? 'TẠM DỪNG' : 'BẮT ĐẦU'}
                                             </button>
@@ -303,7 +552,7 @@
                                                 <Icon name="RotateCcw" size={24} className="text-slate-500" />
                                             </button>
                                         </div>
-                                        
+
                                         {/* Quotes Text */}
                                         <div className="mt-2 text-center flex flex-col items-center max-w-[280px]">
                                             <p className="text-[12px] text-slate-400 font-medium italic leading-relaxed">"{quote}"</p>
@@ -326,7 +575,7 @@
                                                 { id: 'tired', label: 'MỆT MỎI' },
                                                 { id: 'noise', label: 'TIẾNG ỒN' }
                                             ].map(d => (
-                                                <button key={d.id} onClick={() => setStats(s => ({...s, distractions: s.distractions + 1}))} 
+                                                <button key={d.id} onClick={() => setStats(s => ({ ...s, distractions: s.distractions + 1 }))}
                                                     className="px-5 h-10 bg-[#F4F7FB] hover:bg-slate-200 text-slate-600 rounded-xl text-[11px] font-bold flex items-center justify-center tracking-wider transition-colors">
                                                     {d.label}
                                                 </button>
@@ -355,7 +604,7 @@
                                                 <button onClick={applyYoutube} className="bg-brand-500 text-white font-bold text-[13px] px-4 rounded-xl hover:bg-brand-600 transition-colors">Áp dụng</button>
                                             </div>
                                         )}
-                                        
+
                                         <div className="mt-2">
                                             <p className="font-bold tracking-widest text-[10px] text-slate-400 mb-3 uppercase">Âm thanh mặc định</p>
                                             <div className="grid grid-cols-5 gap-2">
@@ -396,9 +645,9 @@
                                     <Icon name="Settings" size={28} className="text-brand-500" />
                                     Cài đặt ứng dụng
                                 </h2>
-                                
+
                                 <div className="max-w-2xl space-y-10">
-                                    
+
                                     {/* Edit Pomodoro Durations */}
                                     <div className="space-y-5">
                                         <div>
@@ -408,41 +657,41 @@
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                             <div className="flex flex-col gap-2">
                                                 <label className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">TẬP TRUNG</label>
-                                                <input type="number" min="1" max="120" value={durations.focus} 
-                                                    onChange={(e) => setDurations({...durations, focus: Number(e.target.value) || 1})}
+                                                <input type="number" min="1" max="120" value={durations.focus}
+                                                    onChange={(e) => setDurations({ ...durations, focus: Number(e.target.value) || 1 })}
                                                     className="bg-[#F4F7FB] border border-slate-200 rounded-xl px-5 py-3.5 outline-none focus:border-brand-400 focus:bg-white transition-all font-mono font-bold text-lg text-slate-700" />
                                             </div>
                                             <div className="flex flex-col gap-2">
                                                 <label className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">NGHỈ NGẮN</label>
-                                                <input type="number" min="1" max="30" value={durations.shortBreak} 
-                                                    onChange={(e) => setDurations({...durations, shortBreak: Number(e.target.value) || 1})}
+                                                <input type="number" min="1" max="30" value={durations.shortBreak}
+                                                    onChange={(e) => setDurations({ ...durations, shortBreak: Number(e.target.value) || 1 })}
                                                     className="bg-[#F4F7FB] border border-slate-200 rounded-xl px-5 py-3.5 outline-none focus:border-brand-400 focus:bg-white transition-all font-mono font-bold text-lg text-slate-700" />
                                             </div>
                                             <div className="flex flex-col gap-2">
                                                 <label className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">NGHỈ DÀI</label>
-                                                <input type="number" min="1" max="60" value={durations.longBreak} 
-                                                    onChange={(e) => setDurations({...durations, longBreak: Number(e.target.value) || 1})}
+                                                <input type="number" min="1" max="60" value={durations.longBreak}
+                                                    onChange={(e) => setDurations({ ...durations, longBreak: Number(e.target.value) || 1 })}
                                                     className="bg-[#F4F7FB] border border-slate-200 rounded-xl px-5 py-3.5 outline-none focus:border-brand-400 focus:bg-white transition-all font-mono font-bold text-lg text-slate-700" />
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <hr className="border-slate-100" />
-                                    
+
                                     <div className="flex justify-between items-center bg-red-50 p-6 rounded-[24px]">
                                         <div>
                                             <h3 className="font-bold text-red-600 text-lg">Xóa dữ liệu</h3>
                                             <p className="text-[13px] text-red-400 font-medium mt-1">Xóa toàn bộ thống kê lịch sử. Không thể hoàn tác.</p>
                                         </div>
                                         <button className="px-6 py-3 bg-red-600 text-white font-bold text-[13px] rounded-xl hover:bg-red-700 transition-colors shadow-md"
-                                            onClick={() => { if(confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu thống kê?')) setStats({ focusMinutesToday: 0, streak: 0, distractions: 0 }); }}>
+                                            onClick={() => { if (confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu thống kê?')) setStats({ focusMinutesToday: 0, streak: 0, distractions: 0 }); }}>
                                             XÓA DỮ LIỆU
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         )}
-                        
+
                         {/* STATS VIEW STUB */}
                         {activeTab === 'stats' && (
                             <div className="flex-1 bg-white rounded-[32px] shadow-soft border border-slate-100 p-10 overflow-y-auto">
@@ -462,11 +711,11 @@
                                     </div>
                                 </div>
                                 <div className="h-64 border-2 border-dashed border-slate-200 rounded-[24px] flex items-center justify-center bg-slate-50 text-slate-400 font-medium">
-                                        (Khu vực hiển thị biểu đồ Recharts)
+                                    (Khu vực hiển thị biểu đồ Recharts)
                                 </div>
                             </div>
                         )}
-                        
+
                         {/* TASKS VIEW STUB */}
                         {activeTab === 'tasks' && (
                             <div className="flex-1 bg-white rounded-[32px] shadow-soft border border-slate-100 p-10 overflow-y-auto">
@@ -487,4 +736,5 @@
         root.render(<App />);
     </script>
 </body>
+
 </html>
