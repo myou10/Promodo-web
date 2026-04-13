@@ -66,6 +66,19 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Hide number input arrows */
+        input[type=number]::-webkit-outer-spin-button,
+        input[type=number]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     </style>
 </head>
 
@@ -372,6 +385,7 @@
 
             // Customizable durations (in minutes)
             const [durations, setDurations] = useState({ focus: 25, shortBreak: 5, longBreak: 15 });
+            const [showTimeEditor, setShowTimeEditor] = useState(false);
 
             const [mode, setMode] = useState('focus');
             const [timeLeft, setTimeLeft] = useState(durations.focus * 60);
@@ -383,6 +397,14 @@
             const [ytLinkInput, setYtLinkInput] = useState('');
             const [ytEmbedUrl, setYtEmbedUrl] = useState('');
             const [activeSound, setActiveSound] = useState(null);
+
+            const adjustDuration = (key, delta) => {
+                const limits = { focus: [1, 120], shortBreak: [1, 30], longBreak: [1, 60] };
+                setDurations(prev => {
+                    const newVal = Math.max(limits[key][0], Math.min(limits[key][1], prev[key] + delta));
+                    return { ...prev, [key]: newVal };
+                });
+            };
 
             const tickRef = useRef(null);
 
@@ -464,10 +486,10 @@
             const strokeDashoffset = (progressOffset / 100) * circumference;
 
             return (
-                <div className="flex h-screen p-4 md:p-6 lg:p-8 gap-6 font-sans">
+                <div className="flex h-screen p-4 md:p-6 lg:p-8 gap-5 font-sans">
 
                     {/* Left Sidebar */}
-                    <div className="w-64 flex flex-col gap-6 flex-shrink-0 h-full">
+                    <div className="w-64 flex flex-col gap-5 flex-shrink-0 h-full">
                         <div className="flex items-center gap-3 pl-2">
                             <div className="bg-brand-500 text-white p-2 rounded-xl">
                                 <Icon name="Brain" size={24} />
@@ -503,24 +525,53 @@
                     </div>
 
                     {/* Main Content */}
-                    <div className="flex-1 flex gap-6 h-full overflow-hidden">
+                    <div className="flex-1 flex gap-5 h-full overflow-hidden">
 
                         {/* TIMER VIEW (Includes Center + Right Column) */}
                         {activeTab === 'timer' && (
                             <>
                                 {/* Center Column - Timer View */}
-                                <div className="flex-1 flex flex-col gap-6 min-w-0">
-                                    <div className="flex-1 bg-white rounded-[32px] shadow-soft border border-slate-100 flex flex-col items-center relative p-8">
+                                <div className="flex-1 flex flex-col gap-5 min-w-0">
+                                    <div className="flex-1 bg-white rounded-[28px] shadow-soft border border-slate-100 flex flex-col items-center relative p-8">
 
-                                        {/* Modifiers */}
-                                        <div className="flex bg-[#F3F4F6] p-1.5 rounded-full border border-slate-100 mt-2">
-                                            {Object.values(MODES).map((m) => (
-                                                <button key={m.key} onClick={() => handleSwitchMode(m.key)}
-                                                    className={`px-8 py-2.5 rounded-full text-xs font-bold transition-all tracking-wider ${mode === m.key ? 'bg-white text-brand-500 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                                                    {m.label}
-                                                </button>
-                                            ))}
+                                        {/* Mode Tabs + Gear Button */}
+                                        <div className="flex items-center gap-3 mt-2">
+                                            <div className="flex bg-[#F3F4F6] p-1.5 rounded-full border border-slate-100">
+                                                {Object.values(MODES).map((m) => (
+                                                    <button key={m.key} onClick={() => handleSwitchMode(m.key)}
+                                                        className={`px-8 py-2.5 rounded-full text-xs font-bold transition-all tracking-wider ${mode === m.key ? 'bg-white text-brand-500 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                                                        {m.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <button onClick={() => setShowTimeEditor(!showTimeEditor)}
+                                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${showTimeEditor ? 'bg-brand-500 text-white shadow-md' : 'bg-[#F3F4F6] text-slate-400 hover:text-brand-500 hover:bg-brand-50 border border-slate-100'}`}>
+                                                <Icon name="SlidersHorizontal" size={18} strokeWidth={2} />
+                                            </button>
                                         </div>
+
+                                        {/* Inline Time Editor */}
+                                        {showTimeEditor && (
+                                            <div className="flex gap-4 mt-4 bg-[#F8FAFC] p-4 rounded-2xl border border-slate-100 animate-in" style={{animation: 'fadeSlideIn 0.25s ease-out'}}>
+                                                {[
+                                                    { key: 'focus', label: 'Tập trung', color: 'brand', icon: 'Brain' },
+                                                    { key: 'shortBreak', label: 'Nghỉ ngắn', color: 'emerald', icon: 'Coffee' },
+                                                    { key: 'longBreak', label: 'Nghỉ dài', color: 'violet', icon: 'Sunset' }
+                                                ].map(item => (
+                                                    <div key={item.key} className="flex flex-col items-center gap-2">
+                                                        <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">{item.label}</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <button onClick={() => adjustDuration(item.key, -1)} disabled={isActive}
+                                                                className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-brand-500 hover:border-brand-300 transition-all disabled:opacity-30 text-lg font-bold">−</button>
+                                                            <span className="w-12 text-center font-mono font-bold text-lg text-slate-700">{durations[item.key]}</span>
+                                                            <button onClick={() => adjustDuration(item.key, 1)} disabled={isActive}
+                                                                className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-brand-500 hover:border-brand-300 transition-all disabled:opacity-30 text-lg font-bold">+</button>
+                                                        </div>
+                                                        <span className="text-[9px] text-slate-300 font-medium">phút</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
 
                                         {/* Timer Circle */}
                                         <div className="relative flex items-center justify-center w-80 h-80 my-auto">
@@ -559,7 +610,7 @@
                                         </div>
                                     </div>
 
-                                    <div className="h-[90px] bg-white rounded-[24px] shadow-soft border border-slate-100 flex items-center px-6 gap-6">
+                                    <div className="h-[90px] bg-white rounded-[28px] shadow-soft border border-slate-100 flex items-center px-6 gap-6">
                                         <div className="flex items-center gap-3 w-48">
                                             <div className="w-10 h-10 rounded-full border-2 border-orange-100 bg-orange-50 text-orange-400 flex items-center justify-center shrink-0">
                                                 <Icon name="AlertCircle" size={20} />
@@ -585,8 +636,8 @@
                                 </div>
 
                                 {/* Right Column - Tools */}
-                                <div className="w-[340px] flex flex-col gap-6 flex-shrink-0">
-                                    <div className="bg-white rounded-[24px] p-6 shadow-soft border border-slate-100 flex flex-col gap-5">
+                                <div className="w-[340px] flex flex-col gap-5 flex-shrink-0">
+                                    <div className="bg-white rounded-[28px] p-6 shadow-soft border border-slate-100 flex flex-col gap-5">
                                         <div className="flex items-center gap-2 text-slate-800 font-bold text-[15px]">
                                             <Icon name="Youtube" size={22} className="text-red-500 fill-current" /> YouTube Focus
                                         </div>
@@ -600,7 +651,7 @@
                                             </div>
                                         ) : (
                                             <div className="flex gap-2">
-                                                <input type="text" value={ytLinkInput} onChange={e => setYtLinkInput(e.target.value)} placeholder="Dán link YouTube (ví dụ: https://youtu.be/...)" className="flex-1 bg-[#F4F7FB] border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-600 outline-none focus:border-brand-300 font-medium" />
+                                                <input type="text" value={ytLinkInput} onChange={e => setYtLinkInput(e.target.value)} placeholder="Dán link YouTube..." className="flex-1 bg-[#F4F7FB] border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-600 outline-none focus:border-brand-300 font-medium" />
                                                 <button onClick={applyYoutube} className="bg-brand-500 text-white font-bold text-[13px] px-4 rounded-xl hover:bg-brand-600 transition-colors">Áp dụng</button>
                                             </div>
                                         )}
@@ -626,7 +677,7 @@
                                         </div>
                                     </div>
 
-                                    <div className="flex-1 bg-white rounded-[24px] p-6 shadow-soft border border-slate-100 flex flex-col">
+                                    <div className="flex-1 bg-white rounded-[28px] p-6 shadow-soft border border-slate-100 flex flex-col">
                                         <div className="flex items-center gap-2 text-slate-800 font-bold text-[15px] mb-4">
                                             <Icon name="CheckCircle2" size={22} className="text-brand-500" /> Đang thực hiện
                                         </div>
@@ -640,7 +691,7 @@
 
                         {/* SETTINGS VIEW */}
                         {activeTab === 'settings' && (
-                            <div className="flex-1 bg-white rounded-[32px] shadow-soft border border-slate-100 p-10 overflow-y-auto">
+                            <div className="flex-1 bg-white rounded-[28px] shadow-soft border border-slate-100 p-10 overflow-y-auto">
                                 <h2 className="text-2xl font-bold mb-8 flex items-center gap-3">
                                     <Icon name="Settings" size={28} className="text-brand-500" />
                                     Cài đặt ứng dụng
@@ -657,21 +708,33 @@
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                             <div className="flex flex-col gap-2">
                                                 <label className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">TẬP TRUNG</label>
-                                                <input type="number" min="1" max="120" value={durations.focus}
-                                                    onChange={(e) => setDurations({ ...durations, focus: Number(e.target.value) || 1 })}
-                                                    className="bg-[#F4F7FB] border border-slate-200 rounded-xl px-5 py-3.5 outline-none focus:border-brand-400 focus:bg-white transition-all font-mono font-bold text-lg text-slate-700" />
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => adjustDuration('focus', -1)} className="w-10 h-10 rounded-xl bg-[#F4F7FB] border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-500 hover:border-brand-300 transition-all text-xl font-bold">−</button>
+                                                    <input type="number" min="1" max="120" value={durations.focus}
+                                                        onChange={(e) => setDurations({ ...durations, focus: Number(e.target.value) || 1 })}
+                                                        className="flex-1 bg-[#F4F7FB] border border-slate-200 rounded-xl px-5 py-3.5 outline-none focus:border-brand-400 focus:bg-white transition-all font-mono font-bold text-lg text-slate-700 text-center" />
+                                                    <button onClick={() => adjustDuration('focus', 1)} className="w-10 h-10 rounded-xl bg-[#F4F7FB] border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-500 hover:border-brand-300 transition-all text-xl font-bold">+</button>
+                                                </div>
                                             </div>
                                             <div className="flex flex-col gap-2">
                                                 <label className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">NGHỈ NGẮN</label>
-                                                <input type="number" min="1" max="30" value={durations.shortBreak}
-                                                    onChange={(e) => setDurations({ ...durations, shortBreak: Number(e.target.value) || 1 })}
-                                                    className="bg-[#F4F7FB] border border-slate-200 rounded-xl px-5 py-3.5 outline-none focus:border-brand-400 focus:bg-white transition-all font-mono font-bold text-lg text-slate-700" />
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => adjustDuration('shortBreak', -1)} className="w-10 h-10 rounded-xl bg-[#F4F7FB] border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-500 hover:border-brand-300 transition-all text-xl font-bold">−</button>
+                                                    <input type="number" min="1" max="30" value={durations.shortBreak}
+                                                        onChange={(e) => setDurations({ ...durations, shortBreak: Number(e.target.value) || 1 })}
+                                                        className="flex-1 bg-[#F4F7FB] border border-slate-200 rounded-xl px-5 py-3.5 outline-none focus:border-brand-400 focus:bg-white transition-all font-mono font-bold text-lg text-slate-700 text-center" />
+                                                    <button onClick={() => adjustDuration('shortBreak', 1)} className="w-10 h-10 rounded-xl bg-[#F4F7FB] border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-500 hover:border-brand-300 transition-all text-xl font-bold">+</button>
+                                                </div>
                                             </div>
                                             <div className="flex flex-col gap-2">
                                                 <label className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">NGHỈ DÀI</label>
-                                                <input type="number" min="1" max="60" value={durations.longBreak}
-                                                    onChange={(e) => setDurations({ ...durations, longBreak: Number(e.target.value) || 1 })}
-                                                    className="bg-[#F4F7FB] border border-slate-200 rounded-xl px-5 py-3.5 outline-none focus:border-brand-400 focus:bg-white transition-all font-mono font-bold text-lg text-slate-700" />
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => adjustDuration('longBreak', -1)} className="w-10 h-10 rounded-xl bg-[#F4F7FB] border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-500 hover:border-brand-300 transition-all text-xl font-bold">−</button>
+                                                    <input type="number" min="1" max="60" value={durations.longBreak}
+                                                        onChange={(e) => setDurations({ ...durations, longBreak: Number(e.target.value) || 1 })}
+                                                        className="flex-1 bg-[#F4F7FB] border border-slate-200 rounded-xl px-5 py-3.5 outline-none focus:border-brand-400 focus:bg-white transition-all font-mono font-bold text-lg text-slate-700 text-center" />
+                                                    <button onClick={() => adjustDuration('longBreak', 1)} className="w-10 h-10 rounded-xl bg-[#F4F7FB] border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-500 hover:border-brand-300 transition-all text-xl font-bold">+</button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -694,9 +757,9 @@
 
                         {/* STATS VIEW STUB */}
                         {activeTab === 'stats' && (
-                            <div className="flex-1 bg-white rounded-[32px] shadow-soft border border-slate-100 p-10 overflow-y-auto">
+                            <div className="flex-1 bg-white rounded-[28px] shadow-soft border border-slate-100 p-10 overflow-y-auto">
                                 <h2 className="text-2xl font-bold mb-8">Thống kê hoạt động</h2>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
                                     <div className="bg-brand-50 p-6 rounded-[20px] border border-brand-100">
                                         <p className="text-brand-600 font-bold mb-2 text-xs uppercase tracking-widest">Phút Tập Trung</p>
                                         <p className="text-4xl font-mono font-bold text-brand-700">{stats.focusMinutesToday}</p>
@@ -718,7 +781,7 @@
 
                         {/* TASKS VIEW STUB */}
                         {activeTab === 'tasks' && (
-                            <div className="flex-1 bg-white rounded-[32px] shadow-soft border border-slate-100 p-10 overflow-y-auto">
+                            <div className="flex-1 bg-white rounded-[28px] shadow-soft border border-slate-100 p-10 overflow-y-auto">
                                 <h2 className="text-2xl font-bold mb-8">Quản lý công việc</h2>
                                 <div className="border border-slate-200 rounded-xl p-4 flex gap-4">
                                     <input type="text" placeholder="Thêm công việc mới..." className="flex-1 outline-none text-sm font-medium" />
