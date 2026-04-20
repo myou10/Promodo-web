@@ -612,12 +612,9 @@
                                 </div>
                                 <div className="flex gap-5">
                                     {[
-                                        { id: 'social', icon: 'Network', label: 'Mạng
-xã hội', badgeColor: 'text-[#6B63ED]', iconBg: 'bg-[#EEEDFC]' },
-                                        { id: 'msg', icon: 'MessageSquare', label: 'Tin
-nhắn', badgeColor: 'text-[#4299E1]', iconBg: 'bg-[#EBF8FF]' },
-                                        { id: 'eat', icon: 'Utensils', label: 'Ăn
-uống', badgeColor: 'text-[#ED64A6]', iconBg: 'bg-[#FFF5F7]' },
+                                        { id: 'social', icon: 'Network', label: 'Mạng\nxã hội', badgeColor: 'text-[#6B63ED]', iconBg: 'bg-[#EEEDFC]' },
+                                        { id: 'msg', icon: 'MessageSquare', label: 'Tin\nnhắn', badgeColor: 'text-[#4299E1]', iconBg: 'bg-[#EBF8FF]' },
+                                        { id: 'eat', icon: 'Utensils', label: 'Ăn\nuống', badgeColor: 'text-[#ED64A6]', iconBg: 'bg-[#FFF5F7]' },
                                         { id: 'other', icon: 'MoreHorizontal', label: 'Khác', badgeColor: 'text-slate-500', iconBg: 'bg-slate-200' }
                                     ].map(d => (
                                         <button key={d.id} onClick={() => setStats(s => ({ ...s, distractions: s.distractions + 1 }))} 
@@ -625,8 +622,7 @@ uống', badgeColor: 'text-[#ED64A6]', iconBg: 'bg-[#FFF5F7]' },
                                             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${d.badgeColor} ${d.iconBg} transform group-hover:scale-105 transition-transform`}>
                                                 <Icon name={d.icon} size={28} strokeWidth={2.5} />
                                             </div>
-                                            <span className="text-[15px] font-bold text-[#2D3748] text-center leading-tight whitespace-pre-line">{d.label.replace('\n', '
-')}</span>
+                                            <span className="text-[15px] font-bold text-[#2D3748] text-center leading-tight whitespace-pre-line">{d.label}</span>
                                         </button>
                                     ))}
                                 </div>
