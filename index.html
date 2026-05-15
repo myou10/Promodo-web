@@ -419,6 +419,30 @@
 
             const [stats, setStats] = useState({ focusMinutesToday: 0, streak: 0, distractions: 0 });
 
+            const [tasks, setTasks] = useState([{ id: 1, text: 'Hoàn thiện Prototype UI cho Smart Focus Dashboard', completed: false }]);
+            const [newTask, setNewTask] = useState('');
+            const [editingTaskId, setEditingTaskId] = useState(null);
+            const [editingText, setEditingText] = useState('');
+
+            const addTask = () => {
+                if (newTask.trim()) {
+                    setTasks([...tasks, { id: Date.now(), text: newTask.trim(), completed: false }]);
+                    setNewTask('');
+                }
+            };
+            const toggleTask = (id) => setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+            const deleteTask = (id) => setTasks(tasks.filter(t => t.id !== id));
+            const startEditTask = (task) => { setEditingTaskId(task.id); setEditingText(task.text); };
+            const saveEditTask = (id) => {
+                if (editingText.trim()) {
+                    setTasks(tasks.map(t => t.id === id ? { ...t, text: editingText.trim() } : t));
+                    setEditingTaskId(null);
+                }
+            };
+
+            const completedCount = tasks.filter(t => t.completed).length;
+            const progressPercent = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+
             const [quote, setQuote] = useState(QUOTE_LIBRARY[0]);
             const [ytLinkInput, setYtLinkInput] = useState('');
             const [ytEmbedUrl, setYtEmbedUrl] = useState('');
@@ -543,10 +567,7 @@
                                 </button>
                             ))}
                         </nav>
-                        <div className="flex flex-col gap-2 mt-auto px-4">
-                            <button className="bg-[#6B63ED] text-white rounded-2xl py-3.5 font-bold text-[14px] w-full hover:bg-brand-600 transition-all shadow-[0_8px_20px_-4px_rgba(107,99,237,0.3)] hover:shadow-[0_10px_25px_-4px_rgba(107,99,237,0.4)] hover:-translate-y-0.5 mb-4">
-                                Start Session
-                            </button>
+                        <div className="flex flex-col gap-2 mt-auto px-4 pb-4">
                             <button className="flex items-center gap-3 px-5 py-2.5 font-medium text-[14px] text-slate-500 hover:text-slate-800 transition-all rounded-xl hover:bg-slate-100">
                                 <Icon name="HelpCircle" size={18} className="text-slate-400" /> Support
                             </button>
@@ -565,11 +586,6 @@
                         <div className="flex-1 flex flex-col min-w-0 px-12 py-10 overflow-y-auto scrollbar-hide relative bg-[#F8F9FB]">
                             {/* Header Section */}
                             <div className="flex flex-col mb-4">
-                                <div className="flex items-center gap-2 text-[13px] text-slate-500 mb-2 font-medium">
-                                    <span className="hover:text-slate-700 cursor-pointer transition-colors">Dashboard</span>
-                                    <Icon name="ChevronRight" size={14} className="text-slate-400" />
-                                    <span className="font-bold text-brand-600">Focus Timer</span>
-                                </div>
                                 <div className="flex justify-between items-end">
                                     <h2 className="text-[32px] font-black text-[#1E293B] tracking-tight">Deep Work Protocol</h2>
                                     <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100">
@@ -613,23 +629,37 @@
                                 <p className="text-[14px] text-slate-400 font-medium italic text-center max-w-[400px] h-10 flex items-center justify-center">"{quote}"</p>
 
                                 {showTimeEditor && (
-                                   <div className="absolute top-[40%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-md p-6 rounded-3xl shadow-[0_20px_50px_-10px_rgba(0,0,0,0.15)] z-50 border border-slate-100/50 flex gap-5 animate-in fade-in zoom-in duration-200">
-                                        {[
-                                            { key: 'focus', label: 'Tập trung' },
-                                            { key: 'shortBreak', label: 'Nghỉ ngắn' },
-                                            { key: 'longBreak', label: 'Nghỉ dài' }
-                                        ].map(item => (
-                                            <div key={item.key} className="flex flex-col items-center gap-3">
-                                                <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">{item.label}</span>
-                                                <div className="flex items-center gap-1.5 bg-[#F4F6F9] rounded-2xl p-1.5 border border-slate-200/60">
-                                                    <button onClick={() => adjustDuration(item.key, -1)} disabled={isActive}
-                                                        className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-600 text-lg hover:text-brand-600 transition-colors disabled:opacity-50">−</button>
-                                                    <span className="w-10 text-center font-mono font-bold text-[17px] text-slate-700">{durations[item.key]}</span>
-                                                    <button onClick={() => adjustDuration(item.key, 1)} disabled={isActive}
-                                                        className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-600 text-lg hover:text-brand-600 transition-colors disabled:opacity-50">+</button>
-                                                </div>
+                                   <div className="absolute top-[40%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-md p-6 rounded-3xl shadow-[0_20px_50px_-10px_rgba(0,0,0,0.15)] z-50 border border-slate-100/50 flex flex-col gap-4 animate-in fade-in zoom-in duration-200 min-w-[320px]">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <h3 className="text-[14px] font-extrabold text-slate-800">Cài đặt thời gian</h3>
+                                            <button onClick={() => setShowTimeEditor(false)} className="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full w-7 h-7 flex items-center justify-center transition-colors">
+                                                <Icon name="X" size={14} />
+                                            </button>
+                                        </div>
+                                        {isActive && (
+                                            <div className="bg-amber-50 text-amber-700 text-[12px] font-medium px-3 py-2 rounded-xl border border-amber-100 flex items-center gap-2">
+                                                <Icon name="AlertCircle" size={14} className="shrink-0" />
+                                                <span>Vui lòng tạm dừng đồng hồ để chỉnh sửa.</span>
                                             </div>
-                                        ))}
+                                        )}
+                                        <div className="flex gap-4 justify-between">
+                                            {[
+                                                { key: 'focus', label: 'Tập trung' },
+                                                { key: 'shortBreak', label: 'Nghỉ ngắn' },
+                                                { key: 'longBreak', label: 'Nghỉ dài' }
+                                            ].map(item => (
+                                                <div key={item.key} className="flex flex-col items-center gap-3">
+                                                    <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">{item.label}</span>
+                                                    <div className="flex items-center gap-1.5 bg-[#F4F6F9] rounded-2xl p-1.5 border border-slate-200/60">
+                                                        <button onClick={() => adjustDuration(item.key, -1)} disabled={isActive}
+                                                            className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-600 text-lg hover:text-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">−</button>
+                                                        <span className="w-10 text-center font-mono font-bold text-[17px] text-slate-700">{durations[item.key]}</span>
+                                                        <button onClick={() => adjustDuration(item.key, 1)} disabled={isActive}
+                                                            className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-600 text-lg hover:text-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">+</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                    </div>
                                 )}
                             </div>
@@ -734,23 +764,39 @@
                             </div>
 
                             {/* Current Task Section */}
-                            <div className="mt-auto bg-slate-50 rounded-[20px] p-5 border border-slate-100 relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 w-24 h-24 bg-brand-600/5 rounded-bl-[100px] -z-0 transition-transform group-hover:scale-110"></div>
-                                <div className="flex justify-between items-start mb-3 relative z-10">
+                            <div className="mt-auto bg-slate-50 rounded-[20px] p-5 border border-slate-100 relative overflow-hidden flex flex-col shrink-0">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-brand-600/5 rounded-bl-[100px] pointer-events-none"></div>
+                                <div className="flex justify-between items-center mb-4 relative z-10">
                                     <p className="text-[11px] font-extrabold text-brand-600 uppercase tracking-widest flex items-center gap-1.5">
                                         <span className="w-1.5 h-1.5 rounded-full bg-brand-600 animate-pulse"></span>
                                         Mục tiêu hiện tại
                                     </p>
-                                    <button className="text-slate-400 hover:text-brand-600 transition-colors">
-                                        <Icon name="Edit3" size={14} />
+                                    <button onClick={() => setActiveTab('mission')} className="text-[11px] font-bold text-slate-500 hover:text-brand-600 flex items-center gap-1 transition-colors bg-white px-2 py-1 rounded border border-slate-200 hover:border-brand-200 shadow-sm">
+                                        Quản lý <Icon name="ArrowRight" size={12} />
                                     </button>
                                 </div>
-                                <h4 className="font-semibold text-[15px] text-slate-800 leading-snug mb-4 relative z-10">Hoàn thiện Prototype UI cho Smart Focus Dashboard</h4>
-                                <div className="flex items-center gap-3 relative z-10">
-                                    <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                        <div className="h-full bg-brand-600 rounded-full w-[65%]"></div>
+                                
+                                <div className="flex flex-col gap-2.5 relative z-10 mb-4 max-h-[180px] overflow-y-auto scrollbar-hide pr-1">
+                                    {tasks.map(task => (
+                                        <div key={task.id} className="flex items-start gap-2.5 group">
+                                            <button onClick={() => toggleTask(task.id)} className={`mt-0.5 shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${task.completed ? 'bg-brand-600 border-brand-600 text-white' : 'border-slate-300 bg-white hover:border-brand-400'}`}>
+                                                {task.completed && <Icon name="Check" size={12} strokeWidth={3} />}
+                                            </button>
+                                            <span className={`flex-1 text-[13.5px] font-medium leading-snug transition-colors line-clamp-2 ${task.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{task.text}</span>
+                                        </div>
+                                    ))}
+                                    {tasks.length === 0 && (
+                                        <p className="text-[12px] text-slate-400 italic text-center py-2">Chưa có mục tiêu nào. Hãy thêm mới!</p>
+                                    )}
+                                </div>
+
+                                <div className="relative z-10 pt-3 border-t border-slate-200/60">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                            <div className="h-full bg-brand-600 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
+                                        </div>
+                                        <span className="text-[11px] text-slate-500 font-bold tabular-nums">{progressPercent}%</span>
                                     </div>
-                                    <span className="text-[12px] text-slate-500 font-bold">65%</span>
                                 </div>
                             </div>
                         </div>
@@ -758,10 +804,85 @@
                         )}
 
                         {activeTab === 'mission' && (
-                            <div className="flex-1 flex flex-col items-center justify-center bg-[#F8F9FB] text-slate-500">
-                                <Icon name="Target" size={64} className="mb-4 text-slate-300" />
-                                <h2 className="text-2xl font-bold text-slate-700 mb-2">Mission</h2>
-                                <p>Tính năng đang được phát triển.</p>
+                            <div className="flex-1 flex flex-col bg-[#F8F9FB] overflow-hidden">
+                                {/* Header */}
+                                <div className="px-12 py-10 shrink-0 border-b border-slate-200/60 bg-white/50 backdrop-blur-sm z-10">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-brand-100 flex items-center justify-center text-brand-600 shadow-sm border border-brand-200/50">
+                                            <Icon name="Target" size={24} strokeWidth={2.5} />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-[28px] font-black text-[#1E293B] tracking-tight leading-none mb-1">Mission Control</h2>
+                                            <p className="text-[13px] text-slate-500 font-medium">Quản lý và theo dõi các mục tiêu tập trung của bạn</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Main Content */}
+                                <div className="flex-1 overflow-y-auto px-12 py-8 scrollbar-hide relative">
+                                    <div className="max-w-3xl mx-auto flex flex-col gap-6 relative z-10">
+                                        
+                                        {/* Add Task Input */}
+                                        <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex items-center gap-3 focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/10 transition-all">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0 border border-slate-100">
+                                                <Icon name="Plus" size={20} />
+                                            </div>
+                                            <input type="text" value={newTask} onChange={e => setNewTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTask()} placeholder="Thêm mục tiêu mới cho phiên làm việc..." className="flex-1 bg-transparent border-none outline-none text-[14px] text-slate-700 font-medium placeholder:text-slate-400 placeholder:font-normal" />
+                                            <button onClick={addTask} disabled={!newTask.trim()} className="bg-brand-600 text-white rounded-xl px-6 py-2.5 font-bold text-[13px] hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:hover:bg-brand-600 shadow-sm shrink-0">Thêm</button>
+                                        </div>
+
+                                        {/* Progress Overview */}
+                                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-600/5 rounded-bl-[100px] pointer-events-none"></div>
+                                            <div className="flex justify-between items-end mb-4 relative z-10">
+                                                <div>
+                                                    <h3 className="text-[15px] font-extrabold text-slate-800">Tiến độ hoàn thành</h3>
+                                                    <p className="text-[12px] text-slate-500 font-medium mt-1">{completedCount} / {tasks.length} mục tiêu đã xong</p>
+                                                </div>
+                                                <span className="text-[36px] font-black text-brand-600 tracking-tighter tabular-nums leading-none">{progressPercent}%</span>
+                                            </div>
+                                            <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden relative z-10">
+                                                <div className="h-full bg-brand-600 rounded-full transition-all duration-700 ease-out" style={{ width: `${progressPercent}%` }}></div>
+                                            </div>
+                                        </div>
+
+                                        {/* Task List */}
+                                        <div className="flex flex-col gap-3 pb-8">
+                                            {tasks.map(task => (
+                                                <div key={task.id} className={`group flex items-center gap-4 bg-white p-4 rounded-2xl border transition-all ${task.completed ? 'border-slate-200/60 bg-slate-50/50' : 'border-slate-200 shadow-sm hover:shadow-md hover:border-brand-300'}`}>
+                                                    <button onClick={() => toggleTask(task.id)} className={`shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${task.completed ? 'bg-brand-600 border-brand-600 text-white' : 'border-slate-300 bg-white hover:border-brand-400 text-transparent'}`}>
+                                                        <Icon name="Check" size={14} strokeWidth={3} className={task.completed ? 'opacity-100' : 'opacity-0'} />
+                                                    </button>
+                                                    
+                                                    {editingTaskId === task.id ? (
+                                                        <div className="flex-1 flex gap-2">
+                                                            <input type="text" value={editingText} onChange={e => setEditingText(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveEditTask(task.id)} className="flex-1 text-[14px] border-2 rounded-xl px-3 py-1.5 bg-white outline-none focus:border-brand-500 transition-colors" autoFocus />
+                                                            <button onClick={() => saveEditTask(task.id)} className="bg-brand-50 border border-brand-200 text-brand-600 px-4 py-1.5 rounded-xl font-bold hover:bg-brand-100 transition-colors text-[13px]">Lưu</button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className={`flex-1 text-[14px] font-medium transition-all ${task.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{task.text}</span>
+                                                    )}
+
+                                                    {editingTaskId !== task.id && (
+                                                        <div className="flex opacity-0 group-hover:opacity-100 transition-opacity gap-1.5 shrink-0">
+                                                            <button onClick={() => startEditTask(task)} className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 hover:text-brand-600 hover:bg-brand-50 hover:border-brand-200 transition-all"><Icon name="Edit3" size={16} /></button>
+                                                            <button onClick={() => deleteTask(task.id)} className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-all"><Icon name="Trash2" size={16} /></button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {tasks.length === 0 && (
+                                                <div className="flex flex-col items-center justify-center py-16 text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-300">
+                                                    <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4 text-slate-300">
+                                                        <Icon name="Target" size={32} />
+                                                    </div>
+                                                    <p className="font-bold text-[15px] text-slate-600 mb-1">Chưa có mục tiêu nào</p>
+                                                    <p className="text-[13px]">Hãy thêm mục tiêu đầu tiên để bắt đầu theo dõi tiến độ</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
