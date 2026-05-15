@@ -83,6 +83,20 @@
 </head>
 
 <body class="text-slate-800 h-screen overflow-hidden">
+    <div id="error-display" style="position:fixed; top:0; left:0; width:100%; z-index:9999; background:red; color:white; font-size:16px; padding:20px; display:none; white-space:pre-wrap; word-wrap:break-word;"></div>
+    <script>
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            var errDiv = document.getElementById('error-display');
+            errDiv.style.display = 'block';
+            errDiv.innerHTML += 'Error: ' + msg + '<br>Line: ' + lineNo + '<br>Column: ' + columnNo + '<br>' + (error && error.stack ? error.stack : '') + '<hr>';
+            return false;
+        };
+        window.addEventListener('unhandledrejection', function(event) {
+            var errDiv = document.getElementById('error-display');
+            errDiv.style.display = 'block';
+            errDiv.innerHTML += 'Promise Error: ' + event.reason + '<hr>';
+        });
+    </script>
     <div id="root" class="h-full"></div>
 
     <script type="text/babel">
@@ -386,12 +400,15 @@
                 },
                 stopAll() {
                     Object.keys(activeNodes).forEach(id => this.stop(id));
+                },
+                setVolume(vol) {
+                    // Placeholder to prevent TypeError. Need actual master gain implementation for real volume control.
                 }
             };
         })();
 
                 function App() {
-            const [activeTab, setActiveTab] = useState('dashboard');
+            const [activeTab, setActiveTab] = useState('focus');
 
             const [durations, setDurations] = useState({ focus: 25, shortBreak: 5, longBreak: 15 });
             const [showTimeEditor, setShowTimeEditor] = useState(false);
@@ -491,49 +508,50 @@
 
             const totalSecs = durations[mode] * 60;
             const progressOffset = ((totalSecs - timeLeft) / totalSecs) * 100;
-            const circleRadius = 48;
+            const circleRadius = 46;
             const circumference = 2 * Math.PI * circleRadius;
             const strokeDashoffset = (progressOffset / 100) * circumference;
 
             return (
                 <div className="flex h-screen bg-[#F8F9FB] font-sans overflow-hidden text-slate-800">
                     {/* Left Sidebar */}
-                    <div className="w-[300px] flex flex-col flex-shrink-0 h-full py-10 border-r border-slate-200/50 bg-[#F4F6F9]">
-                        <div className="px-10 mb-8">
-                            <h1 className="font-extrabold text-[22px] text-[#2D3748] tracking-tight leading-tight">Smart Focus</h1>
-                            <p className="text-[10px] font-bold text-slate-400 tracking-[0.15em] mt-1">DIGITAL SANCTUARY</p>
+                    <div className="w-[280px] flex flex-col flex-shrink-0 h-full py-8 border-r border-slate-200/60 bg-[#F4F6F9] shadow-[1px_0_10px_rgba(0,0,0,0.01)] z-20">
+                        <div className="px-8 mb-8">
+                            <h1 className="font-extrabold text-[22px] text-[#2D3748] tracking-tight leading-tight flex items-center gap-2">
+                                <Icon name="Focus" size={24} className="text-brand-600" />
+                                Smart Focus
+                            </h1>
+                            <p className="text-[10px] font-bold text-slate-400 tracking-[0.15em] mt-1 ml-8">DIGITAL SANCTUARY</p>
                         </div>
 
-                        <nav className="flex flex-col gap-2 flex-1 px-4 mt-6">
+                        <nav className="flex flex-col gap-1.5 flex-1 px-4 mt-2">
                             {[
-                                { id: 'dashboard', icon: 'LayoutGrid', label: 'Dashboard' },
-                                { id: 'timer', icon: 'Clock', label: 'Focus Timer' },
-                                { id: 'stats', icon: 'BarChart2', label: 'Analytics' },
-                                { id: 'sounds', icon: 'AudioLines', label: 'Soundscapes' },
-                                { id: 'library', icon: 'BookOpen', label: 'Library' }
+                                { id: 'focus', icon: 'Clock', label: 'Focus' },
+                                { id: 'mission', icon: 'Target', label: 'Mission' },
+                                { id: 'analytics', icon: 'BarChart2', label: 'Analytics' }
                             ].map(item => (
                                 <button key={item.id} onClick={() => setActiveTab(item.id)}
-                                    className={`relative flex items-center gap-4 px-6 py-4 rounded-full font-bold text-[15px] transition-all
+                                    className={`relative flex items-center gap-3.5 px-5 py-3.5 rounded-2xl font-semibold text-[14px] transition-all duration-300
                                     ${activeTab === item.id
-                                            ? 'text-brand-600 bg-white shadow-soft'
-                                            : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}>
-                                    <Icon name={item.icon} size={20} className={activeTab === item.id ? 'text-brand-600' : 'text-slate-500'} />
+                                            ? 'text-brand-600 bg-white shadow-[0_4px_15px_rgba(0,0,0,0.03)]'
+                                            : 'text-slate-500 hover:bg-white/60 hover:text-slate-700'}`}>
+                                    <Icon name={item.icon} size={18} className={activeTab === item.id ? 'text-brand-600' : 'text-slate-400'} />
                                     {item.label}
                                     {activeTab === item.id && (
-                                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-brand-600 rounded-l-full shadow-[0_0_8px_rgba(79,70,229,0.6)]"></div>
+                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-brand-600 rounded-r-full"></div>
                                     )}
                                 </button>
                             ))}
                         </nav>
-                        <div className="flex flex-col gap-2 mt-auto px-6">
-                            <button className="bg-[#6B63ED] text-white rounded-full py-4 font-bold text-[15px] w-full hover:bg-brand-600 transition-colors shadow-[0_8px_20px_-4px_rgba(107,99,237,0.4)] mb-6">
+                        <div className="flex flex-col gap-2 mt-auto px-4">
+                            <button className="bg-[#6B63ED] text-white rounded-2xl py-3.5 font-bold text-[14px] w-full hover:bg-brand-600 transition-all shadow-[0_8px_20px_-4px_rgba(107,99,237,0.3)] hover:shadow-[0_10px_25px_-4px_rgba(107,99,237,0.4)] hover:-translate-y-0.5 mb-4">
                                 Start Session
                             </button>
-                            <button className="flex items-center gap-4 px-6 py-3 font-semibold text-[15px] text-slate-500 hover:text-slate-800 transition-all">
-                                <Icon name="HelpCircle" size={20} className="text-slate-600" /> Support
+                            <button className="flex items-center gap-3 px-5 py-2.5 font-medium text-[14px] text-slate-500 hover:text-slate-800 transition-all rounded-xl hover:bg-slate-100">
+                                <Icon name="HelpCircle" size={18} className="text-slate-400" /> Support
                             </button>
-                            <button className="flex items-center gap-4 px-6 py-3 font-semibold text-[15px] text-slate-500 hover:text-slate-800 transition-all">
-                                <Icon name="Settings" size={20} className="text-slate-600" /> Settings
+                            <button className="flex items-center gap-3 px-5 py-2.5 font-medium text-[14px] text-slate-500 hover:text-slate-800 transition-all rounded-xl hover:bg-slate-100">
+                                <Icon name="Settings" size={18} className="text-slate-400" /> Settings
                             </button>
                         </div>
                     </div>
@@ -542,60 +560,73 @@
                     <div className="flex-1 flex overflow-hidden">
                         
                         {/* Center Column - Timer View */}
-                        <div className="flex-1 flex flex-col min-w-0 px-16 py-10 overflow-y-auto scrollbar-hide relative bg-[#F8F9FB]">
-                            {/* Breadcrumb section */}
-                            <div className="flex items-center gap-2 text-[14px] text-slate-500 mb-3 font-medium">
-                                <span>Dashboard</span>
-                                <Icon name="ChevronRight" size={14} className="text-slate-400" />
-                                <span className="font-bold text-brand-600">Focus Timer</span>
+                        {activeTab === 'focus' && (
+                        <>
+                        <div className="flex-1 flex flex-col min-w-0 px-12 py-10 overflow-y-auto scrollbar-hide relative bg-[#F8F9FB]">
+                            {/* Header Section */}
+                            <div className="flex flex-col mb-4">
+                                <div className="flex items-center gap-2 text-[13px] text-slate-500 mb-2 font-medium">
+                                    <span className="hover:text-slate-700 cursor-pointer transition-colors">Dashboard</span>
+                                    <Icon name="ChevronRight" size={14} className="text-slate-400" />
+                                    <span className="font-bold text-brand-600">Focus Timer</span>
+                                </div>
+                                <div className="flex justify-between items-end">
+                                    <h2 className="text-[32px] font-black text-[#1E293B] tracking-tight">Deep Work Protocol</h2>
+                                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100">
+                                        <Icon name="Flame" size={16} className="text-orange-500" />
+                                        <span className="text-[13px] font-bold text-slate-700">{stats.streak} day streak</span>
+                                    </div>
+                                </div>
                             </div>
-                            <h2 className="text-[36px] font-black text-[#1E293B] tracking-tight mb-10">Deep Work Protocol</h2>
 
                             {/* Timer area */}
-                            <div className="flex-1 flex flex-col items-center justify-center min-h-[420px] -mt-6">
-                                <div className="relative w-[400px] h-[400px] flex flex-col items-center justify-center">
-                                    <svg className="absolute w-full h-full transform -rotate-90">
-                                        <circle cx="50%" cy="50%" r="48%" stroke="#E2E8F0" strokeWidth="12" fill="transparent" />
-                                        <circle cx="50%" cy="50%" r="48%" stroke="#6B63ED" strokeWidth="12" fill="transparent"
+                            <div className="flex-1 flex flex-col items-center justify-center min-h-[460px]">
+                                <div className="relative w-[340px] h-[340px] flex-shrink-0 flex flex-col items-center justify-center mb-8">
+                                    <svg viewBox="0 0 100 100" className="absolute w-full h-full transform -rotate-90 overflow-visible">
+                                        <circle cx="50" cy="50" r="46" stroke="#E2E8F0" strokeWidth="3" fill="transparent" />
+                                        <circle cx="50" cy="50" r="46" stroke="#6B63ED" strokeWidth="3" fill="transparent"
                                             className="transition-all duration-1000 ease-linear"
-                                            strokeDasharray={`${circumference}%`}
-                                            strokeDashoffset={`${strokeDashoffset}%`}
+                                            strokeDasharray={circumference}
+                                            strokeDashoffset={strokeDashoffset}
                                             strokeLinecap="round" />
                                     </svg>
-                                    <div className="flex flex-col items-center justify-center z-10 pt-4">
-                                        <span className="font-black text-[84px] tracking-tighter text-[#1A202C] leading-none mb-3">{formatTime(timeLeft)}</span>
-                                        <span className="text-[14px] font-bold text-[#6B63ED] tracking-[0.15em] uppercase">{mode === 'focus' ? 'FOCUS PHASE' : mode === 'shortBreak' ? 'SHORT BREAK' : 'LONG BREAK'}</span>
+                                    <div className="flex flex-col items-center justify-center z-10 pt-2">
+                                        <span className="font-black text-[76px] tracking-tighter text-[#1A202C] leading-none mb-2 tabular-nums">{formatTime(timeLeft)}</span>
+                                        <span className="text-[12px] font-bold text-[#6B63ED] tracking-[0.2em] uppercase bg-[#EEEDFC] px-3 py-1 rounded-full">
+                                            {mode === 'focus' ? 'FOCUS PHASE' : mode === 'shortBreak' ? 'SHORT BREAK' : 'LONG BREAK'}
+                                        </span>
                                     </div>
                                 </div>
 
-                                <p className="mt-12 text-[15px] text-slate-400 font-medium italic text-center max-w-[360px]">"{quote}"</p>
-
-                                <div className="flex items-center gap-6 mt-12">
-                                    <button onClick={resetTimer} className="w-16 h-16 rounded-full bg-[#E2E8F0] flex items-center justify-center text-slate-600 hover:bg-slate-300 transition-colors group">
-                                        <Icon name="RotateCcw" size={24} className="group-hover:-rotate-90 transition-transform duration-300" />
+                                <div className="flex items-center gap-5 mb-8">
+                                    <button onClick={resetTimer} className="w-14 h-14 rounded-2xl bg-white shadow-soft flex items-center justify-center text-slate-500 hover:text-slate-800 hover:shadow-md transition-all group border border-slate-100">
+                                        <Icon name="RotateCcw" size={20} className="group-hover:-rotate-90 transition-transform duration-300" />
                                     </button>
-                                    <button onClick={toggleTimer} className="w-[180px] h-16 bg-[#6B63ED] rounded-full flex items-center justify-center gap-3 text-white font-bold text-[16px] shadow-[0_10px_25px_-5px_rgba(107,99,237,0.5)] hover:bg-[#5a52da] hover:-translate-y-0.5 transition-all">
-                                        <Icon name={isActive ? 'Pause' : 'Play'} size={22} className="fill-current" /> {isActive ? 'Tạm dừng' : 'Bắt đầu'}
+                                    <button onClick={toggleTimer} className="w-[160px] h-14 bg-[#6B63ED] rounded-2xl flex items-center justify-center gap-2 text-white font-bold text-[15px] shadow-[0_8px_20px_-4px_rgba(107,99,237,0.4)] hover:bg-[#5a52da] hover:-translate-y-0.5 hover:shadow-[0_12px_25px_-4px_rgba(107,99,237,0.5)] transition-all">
+                                        <Icon name={isActive ? 'Pause' : 'Play'} size={20} className="fill-current" /> {isActive ? 'Tạm dừng' : 'Bắt đầu'}
                                     </button>
-                                    <button onClick={() => setShowTimeEditor(!showTimeEditor)} className="w-16 h-16 rounded-full bg-[#E2E8F0] flex items-center justify-center text-slate-600 hover:bg-slate-300 transition-colors hover:rotate-90 duration-300">
-                                        <Icon name="Settings" size={24} />
+                                    <button onClick={() => setShowTimeEditor(!showTimeEditor)} className="w-14 h-14 rounded-2xl bg-white shadow-soft flex items-center justify-center text-slate-500 hover:text-slate-800 hover:shadow-md transition-all hover:rotate-90 duration-300 border border-slate-100">
+                                        <Icon name="Sliders" size={20} />
                                     </button>
                                 </div>
+                                
+                                <p className="text-[14px] text-slate-400 font-medium italic text-center max-w-[400px] h-10 flex items-center justify-center">"{quote}"</p>
+
                                 {showTimeEditor && (
-                                   <div className="absolute top-[45%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur p-6 rounded-3xl shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] z-50 border border-slate-100 flex gap-6 animate-in fade-in zoom-in duration-200">
+                                   <div className="absolute top-[40%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-md p-6 rounded-3xl shadow-[0_20px_50px_-10px_rgba(0,0,0,0.15)] z-50 border border-slate-100/50 flex gap-5 animate-in fade-in zoom-in duration-200">
                                         {[
                                             { key: 'focus', label: 'Tập trung' },
                                             { key: 'shortBreak', label: 'Nghỉ ngắn' },
                                             { key: 'longBreak', label: 'Nghỉ dài' }
                                         ].map(item => (
-                                            <div key={item.key} className="flex flex-col items-center gap-2">
-                                                <span className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">{item.label}</span>
-                                                <div className="flex items-center gap-1 bg-[#F4F6F9] rounded-xl p-1 border border-slate-100">
+                                            <div key={item.key} className="flex flex-col items-center gap-3">
+                                                <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">{item.label}</span>
+                                                <div className="flex items-center gap-1.5 bg-[#F4F6F9] rounded-2xl p-1.5 border border-slate-200/60">
                                                     <button onClick={() => adjustDuration(item.key, -1)} disabled={isActive}
-                                                        className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-600 text-lg font-bold hover:text-brand-600 transition-colors">−</button>
-                                                    <span className="w-12 text-center font-mono font-bold text-lg text-slate-700">{durations[item.key]}</span>
+                                                        className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-600 text-lg hover:text-brand-600 transition-colors disabled:opacity-50">−</button>
+                                                    <span className="w-10 text-center font-mono font-bold text-[17px] text-slate-700">{durations[item.key]}</span>
                                                     <button onClick={() => adjustDuration(item.key, 1)} disabled={isActive}
-                                                        className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-600 text-lg font-bold hover:text-brand-600 transition-colors">+</button>
+                                                        className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-600 text-lg hover:text-brand-600 transition-colors disabled:opacity-50">+</button>
                                                 </div>
                                             </div>
                                         ))}
@@ -604,25 +635,24 @@
                             </div>
 
                             {/* Distractions */}
-                            <div className="mt-8 mb-4">
-                                <h3 className="text-[24px] font-extrabold text-[#1E293B] mb-2">Bị xao nhãng?</h3>
-                                <div className="flex items-center gap-4 mb-8">
-                                    <p className="text-[15px] text-slate-500 font-medium">Ghi lại trạng thái tinh thần của bạn</p>
-                                    <div className="flex-1 h-px bg-slate-200"></div>
+                            <div className="mt-auto pt-4 border-t border-slate-200/60">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-[16px] font-extrabold text-[#1E293B]">Bị xao nhãng?</h3>
+                                    <p className="text-[12px] text-slate-400 font-medium">Ghi lại trạng thái tinh thần của bạn</p>
                                 </div>
-                                <div className="flex gap-5">
+                                <div className="flex gap-4">
                                     {[
-                                        { id: 'social', icon: 'Network', label: 'Mạng\nxã hội', badgeColor: 'text-[#6B63ED]', iconBg: 'bg-[#EEEDFC]' },
-                                        { id: 'msg', icon: 'MessageSquare', label: 'Tin\nnhắn', badgeColor: 'text-[#4299E1]', iconBg: 'bg-[#EBF8FF]' },
-                                        { id: 'eat', icon: 'Utensils', label: 'Ăn\nuống', badgeColor: 'text-[#ED64A6]', iconBg: 'bg-[#FFF5F7]' },
-                                        { id: 'other', icon: 'MoreHorizontal', label: 'Khác', badgeColor: 'text-slate-500', iconBg: 'bg-slate-200' }
+                                        { id: 'social', icon: 'Network', label: 'Mạng xã hội', badgeColor: 'text-[#6B63ED]', iconBg: 'bg-[#EEEDFC]' },
+                                        { id: 'msg', icon: 'MessageSquare', label: 'Tin nhắn', badgeColor: 'text-[#4299E1]', iconBg: 'bg-[#EBF8FF]' },
+                                        { id: 'eat', icon: 'Utensils', label: 'Ăn uống', badgeColor: 'text-[#ED64A6]', iconBg: 'bg-[#FFF5F7]' },
+                                        { id: 'other', icon: 'MoreHorizontal', label: 'Khác', badgeColor: 'text-slate-500', iconBg: 'bg-slate-100' }
                                     ].map(d => (
                                         <button key={d.id} onClick={() => setStats(s => ({ ...s, distractions: s.distractions + 1 }))} 
-                                            className="flex-1 bg-white rounded-[28px] p-6 flex flex-col items-center justify-center gap-4 shadow-soft hover:shadow-md hover:-translate-y-1 transition-all group">
-                                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${d.badgeColor} ${d.iconBg} transform group-hover:scale-105 transition-transform`}>
-                                                <Icon name={d.icon} size={28} strokeWidth={2.5} />
+                                            className="flex-1 bg-white border border-slate-100 rounded-2xl py-3 px-2 flex flex-col items-center justify-center gap-2 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all group">
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${d.badgeColor} ${d.iconBg} transform group-hover:scale-110 transition-transform`}>
+                                                <Icon name={d.icon} size={18} strokeWidth={2.5} />
                                             </div>
-                                            <span className="text-[15px] font-bold text-[#2D3748] text-center leading-tight whitespace-pre-line">{d.label}</span>
+                                            <span className="text-[12px] font-bold text-slate-600 text-center leading-tight">{d.label}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -630,86 +660,118 @@
                         </div>
 
                         {/* Right Column - Tools */}
-                        <div className="w-[380px] bg-white flex flex-col flex-shrink-0 border-l border-slate-200/50 p-8 shadow-[-10px_0_30px_rgba(0,0,0,0.02)] h-full overflow-y-auto scrollbar-hide z-10">
-                            <div className="flex items-center gap-3 mb-5">
-                                <Icon name="Youtube" size={24} className="text-[#FF0000] fill-current" />
-                                <span className="font-extrabold text-[#1E293B] text-[18px]">YouTube Focus</span>
-                            </div>
+                        <div className="w-[340px] bg-white flex flex-col flex-shrink-0 border-l border-slate-200/60 p-6 shadow-[-4px_0_24px_rgba(0,0,0,0.02)] h-full overflow-y-auto scrollbar-hide z-10">
                             
-                            <div className="mb-10 w-full">
-                                {ytEmbedUrl ? (
-                                    <div className="flex flex-col gap-3">
-                                        <div className="relative w-full overflow-hidden rounded-[20px] bg-slate-100 border border-slate-200 aspect-video shadow-sm">
-                                            <iframe src={ytEmbedUrl} className="absolute top-0 left-0 w-full h-full border-0" allow="autoplay; encrypted-media" allowFullScreen></iframe>
+                            {/* YouTube Section */}
+                            <div className="mb-8">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Icon name="Youtube" size={20} className="text-[#FF0000] fill-current" />
+                                    <span className="font-bold text-[#1E293B] text-[16px]">YouTube Focus</span>
+                                </div>
+                                <div className="w-full">
+                                    {ytEmbedUrl ? (
+                                        <div className="flex flex-col gap-3">
+                                            <div className="relative w-full overflow-hidden rounded-2xl bg-slate-100 border border-slate-200 aspect-video shadow-sm">
+                                                <iframe src={ytEmbedUrl} className="absolute top-0 left-0 w-full h-full border-0" allow="autoplay; encrypted-media" allowFullScreen></iframe>
+                                            </div>
+                                            <button onClick={() => { setYtEmbedUrl(''); setYtLinkInput(''); }} className="text-[12px] text-slate-400 font-bold hover:text-red-500 hover:bg-red-50 py-2 rounded-xl text-center uppercase tracking-widest transition-colors w-full">Gỡ video</button>
                                         </div>
-                                        <button onClick={() => { setYtEmbedUrl(''); setYtLinkInput(''); }} className="text-[13px] text-red-500 font-bold hover:bg-red-50 py-2 rounded-xl text-center uppercase tracking-widest transition-colors w-full">Gỡ video</button>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col gap-4">
-                                        <div className="relative w-full rounded-[20px] overflow-hidden bg-slate-100 aspect-video shadow-sm">
-                                            <img src="https://images.unsplash.com/photo-1620025701838-8fa1b49f3e46?q=80&w=2564&auto=format&fit=crop" className="w-full h-full object-cover opacity-80 mix-blend-multiply" />
-                                            <div className="absolute inset-0 flex items-center justify-center bg-[#8cb6cc]/10 backdrop-blur-[1px]">
-                                                 <div className="w-14 h-14 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-lg text-slate-500">
-                                                     <Icon name="Play" size={24} className="fill-current ml-1" />
-                                                 </div>
+                                    ) : (
+                                        <div className="flex flex-col gap-3">
+                                            <div className="relative w-full rounded-2xl overflow-hidden bg-slate-50 border border-slate-200 aspect-video shadow-sm flex flex-col items-center justify-center gap-2 group cursor-pointer hover:bg-slate-100 transition-colors">
+                                                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm text-slate-400 group-hover:text-brand-600 group-hover:scale-110 transition-all">
+                                                    <Icon name="Clock" size={24} />
+                                                </div>
+                                                <span className="text-[13px] font-medium text-slate-500 text-center px-4">Dán link YouTube để phát video</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <input type="text" value={ytLinkInput} onChange={e => setYtLinkInput(e.target.value)} placeholder="Dán link YouTube..." className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-[13px] text-slate-600 outline-none focus:border-[#6B63ED] focus:ring-2 focus:ring-[#6B63ED]/20 shadow-sm bg-slate-50 transition-all" />
+                                                <button onClick={applyYoutube} className="bg-[#6B63ED] text-white rounded-xl px-4 py-2.5 font-bold text-[13px] hover:bg-[#5a52da] transition-colors shadow-sm">Thêm</button>
                                             </div>
                                         </div>
-                                        <input type="text" value={ytLinkInput} onChange={e => setYtLinkInput(e.target.value)} placeholder="Dán link YouTube tại đây..." className="w-full border border-slate-200 rounded-[14px] px-5 py-3.5 text-[14px] text-slate-600 outline-none focus:border-[#6B63ED] shadow-sm font-medium bg-white" />
-                                        <button onClick={applyYoutube} className="w-full bg-[#F3F4FE] text-[#6B63ED] rounded-[14px] py-3.5 font-bold text-[15px] hover:bg-[#e6e8fd] transition-colors shadow-sm">Apply URL</button>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex items-center gap-3 mb-6">
-                                <Icon name="Headphones" size={24} className="text-[#1E293B]" />
-                                <span className="font-extrabold text-[#1E293B] text-[18px]">Ambient Sound</span>
-                            </div>
-                            
-                            <div className="flex gap-2 justify-between mb-8">
-                                {[
-                                    { id: 'rain', icon: 'CloudRain', color: 'bg-[#6B63ED] text-white shadow-md', inactive: 'bg-white text-slate-600' },
-                                    { id: 'coffee', icon: 'Coffee', color: 'bg-[#6B63ED] text-white shadow-md', inactive: 'bg-white text-slate-600' },
-                                    { id: 'waves', icon: 'Waves', color: 'bg-[#6B63ED] text-white shadow-md', inactive: 'bg-white text-slate-600' },
-                                    { id: 'forest', icon: 'TreePine', color: 'bg-[#6B63ED] text-white shadow-md', inactive: 'bg-white text-slate-600' },
-                                    { id: 'noise', icon: 'Disc', color: 'bg-[#6B63ED] text-white shadow-md', inactive: 'bg-white text-slate-600' }
-                                ].map(s => (
-                                    <button key={s.id} onClick={() => toggleSound(s.id)}
-                                        className={`w-[52px] h-[52px] rounded-full flex items-center justify-center border border-slate-100 transition-all ${activeSound === s.id ? s.color : s.inactive + ' hover:bg-slate-50'}`}>
-                                        <Icon name={s.icon} size={22} className={activeSound === s.id ? 'fill-white text-white' : ''} />
-                                    </button>
-                                ))}
-                            </div>
-                            
-                            <div className="flex items-center gap-4 mb-12 px-2">
-                                <Icon name="VolumeX" size={16} className="text-slate-500" />
-                                <div className="flex-1 relative flex items-center">
-                                    <input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(Number(e.target.value))} 
-                                    className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer relative z-20 outline-none" 
-                                    style={{ background: `linear-gradient(to right, #6B63ED ${volume}%, #E2E8F0 ${volume}%)` }}/>
-                                    <style>{`
-                                        input[type=range]::-webkit-slider-thumb {
-                                            -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: white; border: 2px solid #6B63ED; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                                        }
-                                    `}</style>
+                                    )}
                                 </div>
-                                <Icon name="Volume2" size={16} className="text-slate-500" />
                             </div>
 
-                            <div className="mt-auto">
-                                 <p className="text-[13px] font-bold text-slate-500 uppercase tracking-[0.1em] mb-4">MỤC TIÊU HIỆN TẠI</p>
-                                 <div className="bg-[#6B63ED] rounded-[24px] p-7 text-white shadow-[0_12px_30px_-5px_rgba(107,99,237,0.4)] relative overflow-hidden">
-                                     <Icon name="Pin" size={20} className="absolute top-6 right-6 text-white/50 fill-current" />
-                                     <p className="text-[13px] text-white/80 mb-2 font-medium">CURRENT TASK</p>
-                                     <h4 className="font-bold text-[19px] leading-snug w-5/6 pr-4">Hoàn thiện Prototype UI cho Smart Focus Dashboard</h4>
-                                     <div className="flex items-center gap-3 mt-8">
-                                         <div className="w-5 h-5 rounded-full border-[1.5px] border-white/60 flex items-center justify-center">
-                                             <Icon name="Check" size={12} strokeWidth={3} className="text-white" />
-                                         </div>
-                                         <span className="text-[14px] text-white/90 font-medium">Progress: 65%</span>
-                                     </div>
-                                 </div>
+                            {/* Soundscapes Section */}
+                            <div className="mb-8">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Icon name="Headphones" size={20} className="text-[#1E293B]" />
+                                    <span className="font-bold text-[#1E293B] text-[16px]">Ambient Sound</span>
+                                </div>
+                                <div className="flex gap-2 justify-between mb-5">
+                                    {[
+                                        { id: 'rain', icon: 'CloudRain', color: 'bg-[#6B63ED] text-white shadow-md border-transparent', inactive: 'bg-slate-50 text-slate-500 border-slate-200' },
+                                        { id: 'coffee', icon: 'Coffee', color: 'bg-[#6B63ED] text-white shadow-md border-transparent', inactive: 'bg-slate-50 text-slate-500 border-slate-200' },
+                                        { id: 'waves', icon: 'Waves', color: 'bg-[#6B63ED] text-white shadow-md border-transparent', inactive: 'bg-slate-50 text-slate-500 border-slate-200' },
+                                        { id: 'forest', icon: 'TreePine', color: 'bg-[#6B63ED] text-white shadow-md border-transparent', inactive: 'bg-slate-50 text-slate-500 border-slate-200' },
+                                        { id: 'noise', icon: 'Disc', color: 'bg-[#6B63ED] text-white shadow-md border-transparent', inactive: 'bg-slate-50 text-slate-500 border-slate-200' }
+                                    ].map(s => (
+                                        <button key={s.id} onClick={() => toggleSound(s.id)}
+                                            className={`w-[46px] h-[46px] rounded-xl flex items-center justify-center border transition-all duration-300 ${activeSound === s.id ? s.color : s.inactive + ' hover:bg-slate-100 hover:border-slate-300 hover:text-slate-700'}`}>
+                                            <Icon name={s.icon} size={20} className={activeSound === s.id ? 'fill-white/20' : ''} />
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                <div className="flex items-center gap-3 px-1">
+                                    <Icon name="VolumeX" size={14} className="text-slate-400" />
+                                    <div className="flex-1 relative flex items-center h-5">
+                                        <input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(Number(e.target.value))} 
+                                        className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer relative z-20 outline-none" 
+                                        style={{ background: `linear-gradient(to right, #6B63ED ${volume}%, #E2E8F0 ${volume}%)` }}/>
+                                        <style>{`
+                                            input[type=range]::-webkit-slider-thumb {
+                                                -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: white; border: 2.5px solid #6B63ED; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.15); transition: transform 0.1s;
+                                            }
+                                            input[type=range]::-webkit-slider-thumb:hover {
+                                                transform: scale(1.1);
+                                            }
+                                        `}</style>
+                                    </div>
+                                    <Icon name="Volume2" size={14} className="text-slate-400" />
+                                </div>
+                            </div>
+
+                            {/* Current Task Section */}
+                            <div className="mt-auto bg-slate-50 rounded-[20px] p-5 border border-slate-100 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-brand-600/5 rounded-bl-[100px] -z-0 transition-transform group-hover:scale-110"></div>
+                                <div className="flex justify-between items-start mb-3 relative z-10">
+                                    <p className="text-[11px] font-extrabold text-brand-600 uppercase tracking-widest flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-brand-600 animate-pulse"></span>
+                                        Mục tiêu hiện tại
+                                    </p>
+                                    <button className="text-slate-400 hover:text-brand-600 transition-colors">
+                                        <Icon name="Edit3" size={14} />
+                                    </button>
+                                </div>
+                                <h4 className="font-semibold text-[15px] text-slate-800 leading-snug mb-4 relative z-10">Hoàn thiện Prototype UI cho Smart Focus Dashboard</h4>
+                                <div className="flex items-center gap-3 relative z-10">
+                                    <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                        <div className="h-full bg-brand-600 rounded-full w-[65%]"></div>
+                                    </div>
+                                    <span className="text-[12px] text-slate-500 font-bold">65%</span>
+                                </div>
                             </div>
                         </div>
+                        </>
+                        )}
+
+                        {activeTab === 'mission' && (
+                            <div className="flex-1 flex flex-col items-center justify-center bg-[#F8F9FB] text-slate-500">
+                                <Icon name="Target" size={64} className="mb-4 text-slate-300" />
+                                <h2 className="text-2xl font-bold text-slate-700 mb-2">Mission</h2>
+                                <p>Tính năng đang được phát triển.</p>
+                            </div>
+                        )}
+
+                        {activeTab === 'analytics' && (
+                            <div className="flex-1 flex flex-col items-center justify-center bg-[#F8F9FB] text-slate-500">
+                                <Icon name="BarChart2" size={64} className="mb-4 text-slate-300" />
+                                <h2 className="text-2xl font-bold text-slate-700 mb-2">Analytics</h2>
+                                <p>Tính năng đang được phát triển.</p>
+                            </div>
+                        )}
 
                     </div>
                 </div>
